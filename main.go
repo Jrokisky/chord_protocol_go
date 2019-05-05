@@ -2,10 +2,11 @@ package main
 
 import (
 	"chord/chordNode"
+	"encoding/json"
 	"fmt"
 	"time"
 
-	zmq "github.com/alecthomas/gozmq"
+	zmq "github.com/pebbe/zmq4"
 )
 
 type nodeAddress struct {
@@ -35,17 +36,33 @@ type nodeDirectory struct {
 /*
 Send a message over 0MQ
 */
-func SendMessage(address string, port int, msg string) {
+func SendMessage(address string, port int, data string) {
 	context, _ := zmq.NewContext()
 	socket, _ := context.NewSocket(zmq.REQ)
 	defer socket.Close()
 	socket.Bind(fmt.Sprintf("tcp://%s:%d", address, port))
-	socket.Send([]byte(msg), 0)
+	socket.Send(data, 0)
 
 	// Wait for reply:
 	reply, _ := socket.Recv(0)
 	fmt.Printf("Received '%s'\n", string(reply))
 }
+
+/* Generate the JSON command to instruct the node that receives it to join the ring
+at the 'address' argument. */
+func commandSendJoinRing(address string) string {
+	command := make(map[string]interface{})
+	command["do"] = "join-ring"
+	jsonCommand, err := json.Marshal(command)
+	if err != nil {
+		panic(err)
+	}
+	return string(jsonCommand)
+}
+
+// func CommandPutItem(data string) {
+
+// }
 
 func main() {
 	node1 := chordNode.New(1, "127.0.0.1", 5555)
@@ -55,9 +72,8 @@ func main() {
 		// fmt.Print("Write here > ")
 		// input, _ := reader.ReadString('\n')
 		// msg := input
-		msg := "{ \"hello\": \"world\" }"
 		// fmt.Println(input)
-		SendMessage(node1.Address, node1.Port, msg)
+		SendMessage(node1.Address, node1.Port, commandSendJoinRing("123.456.789.110"))
 
 		time.Sleep(100 * time.Millisecond)
 

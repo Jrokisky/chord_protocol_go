@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	zmq "github.com/alecthomas/gozmq"
+	zmq "github.com/pebbe/zmq4"
 )
 
 type fingerTableEntry struct {
@@ -40,24 +40,63 @@ func New(id uint32, address string, port int) ChordNode {
 	return n
 }
 
-// // Borrowed from https://stackoverflow.com/questions/26152993/go-logger-to-print-timestamp
-// func (n ChordNode) Log(l *log.Logger, msg string) {
-// 	l.SetPrefix("[" + time.Now().Format("2006-01-02 15:04:05") + " #" + string(n.ID) + "] ")
-// 	l.Print(msg)
-// }
+// Respond to an instruction to join a chord ring
+func (n ChordNode) JoinRing(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) LeaveRing(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) InitRingFingers(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) FixRingFingers(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) StabilizeRing(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) RingNotify(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) GetRingFingers(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) FindRingSuccessor(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) FindRingPredecessor(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) Put(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) Get(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) Remove(msg map[string]interface{}) {
+
+}
+
+func (n ChordNode) ListItems(msg map[string]interface{}) {
+
+}
 
 func (n ChordNode) Run() {
 
-	// l := log.New(os.Stdout, "", 0)
-
-	// // n.Log(l, "Log 1")
-
-	// <-time.After(time.Second * 3)
-
-	// // n.Log(l, "Log 2")
-
 	context, _ := zmq.NewContext()
-	defer context.Close()
+	defer context.Term()
 
 	socket, _ := context.NewSocket(zmq.REP)
 	defer socket.Close()
@@ -70,13 +109,48 @@ func (n ChordNode) Run() {
 		msg, _ := socket.Recv(0)
 
 		// Set up dict for data to be imported into
-		var data map[string]interface{}
-		err := json.Unmarshal([]byte(msg), &data)
+		var msgMap map[string]interface{}
+		err := json.Unmarshal([]byte(msg), &msgMap)
 		if err != nil {
 			panic(err)
 		}
 
-		fmt.Println("Hello ", data["hello"])
+		command := msgMap["do"].(string) // type assertion
+		println(command)
+
+		// var commandMap map[string]interface{}
+		// err := json.Unmarshal([]byte(command), &commandMap)
+
+		switch command {
+		case "join-ring":
+			n.JoinRing(msgMap)
+		case "init-ring-fingers":
+			n.InitRingFingers(msgMap)
+		case "fix-ring-fingers":
+			n.FixRingFingers(msgMap)
+		case "stabilize-ring":
+			n.StabilizeRing(msgMap)
+		case "leave-ring":
+			n.LeaveRing(msgMap)
+		case "ring-notify":
+			n.RingNotify(msgMap)
+		case "get-ring-fingers":
+			n.GetRingFingers(msgMap)
+		case "find-ring-successor":
+			n.FindRingSuccessor(msgMap)
+		case "find-ring-predecessor":
+			n.FindRingPredecessor(msgMap)
+		case "put":
+			n.Put(msgMap)
+		case "get":
+			n.Get(msgMap)
+		case "remove":
+			n.Remove(msgMap)
+		case "list-items":
+			n.ListItems(msgMap)
+		default:
+			socket.Send("Invalid command received.", 0)
+		}
 
 		// fmt.Printf("Node %d received '%s'\n", n.ID, msg)
 		// fmt.Println(reflect.TypeOf(msg))
@@ -90,7 +164,7 @@ func (n ChordNode) Run() {
 		// println(string(msg))
 		time.Sleep(time.Second)
 		reply := "" //fmt.Sprintf("Message received.")
-		socket.Send([]byte(reply), 0)
+		socket.Send(reply, 0)
 	}
 
 	/*
