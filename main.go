@@ -1,10 +1,8 @@
 package main
 
 import (
-	"bufio"
 	"chord/chordNode"
 	"fmt"
-	"os"
 	"time"
 
 	zmq "github.com/alecthomas/gozmq"
@@ -53,11 +51,12 @@ func main() {
 	node1 := chordNode.New(1, "127.0.0.1", 5555)
 	go node1.Run()
 	for {
-		reader := bufio.NewReader(os.Stdin)
-		fmt.Print("Write here > ")
-		input, _ := reader.ReadString('\n')
-		msg := input
-		fmt.Println(input)
+		// reader := bufio.NewReader(os.Stdin)
+		// fmt.Print("Write here > ")
+		// input, _ := reader.ReadString('\n')
+		// msg := input
+		msg := "{ \"hello\": \"world\" }"
+		// fmt.Println(input)
 		SendMessage(node1.Address, node1.Port, msg)
 
 		time.Sleep(100 * time.Millisecond)
