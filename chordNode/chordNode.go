@@ -1,9 +1,9 @@
 package chordNode
 
 import (
-	"encoding/json"
 	"fmt"
-	"time"
+
+	"github.com/Jeffail/gabs"
 
 	zmq "github.com/pebbe/zmq4"
 )
@@ -41,56 +41,88 @@ func New(id uint32, address string, port int) ChordNode {
 }
 
 // Respond to an instruction to join a chord ring
-func (n ChordNode) JoinRing(msg map[string]interface{}) {
+func (n ChordNode) JoinRing(msg *gabs.Container) {
+	fmt.Printf("Command received to join ring %s")
+}
+
+func (n ChordNode) LeaveRing(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) LeaveRing(msg map[string]interface{}) {
+func (n ChordNode) InitRingFingers(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) InitRingFingers(msg map[string]interface{}) {
+func (n ChordNode) FixRingFingers(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) FixRingFingers(msg map[string]interface{}) {
+func (n ChordNode) StabilizeRing(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) StabilizeRing(msg map[string]interface{}) {
+func (n ChordNode) RingNotify(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) RingNotify(msg map[string]interface{}) {
+func (n ChordNode) GetRingFingers(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) GetRingFingers(msg map[string]interface{}) {
+func (n ChordNode) FindRingSuccessor(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) FindRingSuccessor(msg map[string]interface{}) {
+func (n ChordNode) FindRingPredecessor(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) FindRingPredecessor(msg map[string]interface{}) {
+func (n ChordNode) Put(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) Put(msg map[string]interface{}) {
+func (n ChordNode) Get(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) Get(msg map[string]interface{}) {
+func (n ChordNode) Remove(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) Remove(msg map[string]interface{}) {
+func (n ChordNode) ListItems(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) ListItems(msg map[string]interface{}) {
-
+func (n ChordNode) ProcessIncomingCommand(command string, msg *gabs.Container) string {
+	switch command {
+	case "join-ring":
+		n.JoinRing(msg)
+	case "init-ring-fingers":
+		n.InitRingFingers(msg)
+	case "fix-ring-fingers":
+		n.FixRingFingers(msg)
+	case "stabilize-ring":
+		n.StabilizeRing(msg)
+	case "leave-ring":
+		n.LeaveRing(msg)
+	case "ring-notify":
+		n.RingNotify(msg)
+	case "get-ring-fingers":
+		n.GetRingFingers(msg)
+	case "find-ring-successor":
+		n.FindRingSuccessor(msg)
+	case "find-ring-predecessor":
+		n.FindRingPredecessor(msg)
+	case "put":
+		n.Put(msg)
+	case "get":
+		n.Get(msg)
+	case "remove":
+		n.Remove(msg)
+	case "list-items":
+		n.ListItems(msg)
+	}
+	return "foo"
 }
 
 func (n ChordNode) Run() {
@@ -107,63 +139,10 @@ func (n ChordNode) Run() {
 	// Main loop, listening for commands
 	for true {
 		msg, _ := socket.Recv(0)
-
-		// Set up dict for data to be imported into
-		var msgMap map[string]interface{}
-		err := json.Unmarshal([]byte(msg), &msgMap)
-		if err != nil {
-			panic(err)
-		}
-
-		command := msgMap["do"].(string) // type assertion
-		println(command)
-
-		// var commandMap map[string]interface{}
-		// err := json.Unmarshal([]byte(command), &commandMap)
-
-		switch command {
-		case "join-ring":
-			n.JoinRing(msgMap)
-		case "init-ring-fingers":
-			n.InitRingFingers(msgMap)
-		case "fix-ring-fingers":
-			n.FixRingFingers(msgMap)
-		case "stabilize-ring":
-			n.StabilizeRing(msgMap)
-		case "leave-ring":
-			n.LeaveRing(msgMap)
-		case "ring-notify":
-			n.RingNotify(msgMap)
-		case "get-ring-fingers":
-			n.GetRingFingers(msgMap)
-		case "find-ring-successor":
-			n.FindRingSuccessor(msgMap)
-		case "find-ring-predecessor":
-			n.FindRingPredecessor(msgMap)
-		case "put":
-			n.Put(msgMap)
-		case "get":
-			n.Get(msgMap)
-		case "remove":
-			n.Remove(msgMap)
-		case "list-items":
-			n.ListItems(msgMap)
-		default:
-			socket.Send("Invalid command received.", 0)
-		}
-
-		// fmt.Printf("Node %d received '%s'\n", n.ID, msg)
-		// fmt.Println(reflect.TypeOf(msg))
-		// msgString := string(msg)
-		// b, err := json.MarshalIndent(&msgString, "", "\t")
-		// if err != nil {
-		// 	fmt.Println("error:", err)
-		// }
-		// os.Stdout.Write(b)
-		// n.Log(l, string(messageFormatted))
-		// println(string(msg))
-		time.Sleep(time.Second)
-		reply := "" //fmt.Sprintf("Message received.")
+		jsonParsed, _ := gabs.ParseJSON([]byte(msg))
+		fmt.Println(jsonParsed.StringIndent("", "  "))
+		command := jsonParsed.Path("do").String()
+		reply := n.ProcessIncomingCommand(command, jsonParsed)
 		socket.Send(reply, 0)
 	}
 
