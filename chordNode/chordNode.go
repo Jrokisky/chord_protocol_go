@@ -1,7 +1,7 @@
 package chordNode
 
 import (
-    "chord/utils"
+	"chord/utils"
 
 	"fmt"
 
@@ -27,13 +27,14 @@ type ChordNode struct {
 	Table     fingerTable
 	Address   string
 	Port      int
+	InRing    bool
 }
 
 /*
 Returns a new ChordNode
 */
 func New(address string, port int) ChordNode {
-    id := utils.ComputeId(fmt.Sprintf("tcp://%s:%d", address, port))
+	id := utils.ComputeId(fmt.Sprintf("tcp://%s:%d", address, port))
 	n := ChordNode{
 		ID:      id,
 		Address: address,
@@ -46,25 +47,25 @@ func New(address string, port int) ChordNode {
  * Try to find an open port.
  */
 func GenerateRandomNode() ChordNode {
-    context, _ := zmq.NewContext()
-    defer context.Term()
+	context, _ := zmq.NewContext()
+	defer context.Term()
 
-    socket, _ := context.NewSocket(zmq.REP)
-    defer socket.Close()
+	socket, _ := context.NewSocket(zmq.REP)
+	defer socket.Close()
 
-    rand_port := utils.GetRandomPort()
-    err := socket.Connect(fmt.Sprintf("tcp://%s:%d", utils.Localhost, rand_port))
+	rand_port := utils.GetRandomPort()
+	err := socket.Connect(fmt.Sprintf("tcp://%s:%d", utils.Localhost, rand_port))
 
-    // Error while connecting. Get new port
-    for ;err != nil; {
-        rand_port = utils.GetRandomPort()
-        err = socket.Connect(fmt.Sprintf("tcp://%s:%d", utils.Localhost, rand_port))
-    }
-    return New(utils.Localhost, rand_port)
+	// Error while connecting. Get new port
+	for ;err != nil; {
+		rand_port = utils.GetRandomPort()
+		err = socket.Connect(fmt.Sprintf("tcp://%s:%d", utils.Localhost, rand_port))
+	}
+	return New(utils.Localhost, rand_port)
 }
 
 func (n ChordNode) Print() {
-    fmt.Printf("%+v\n", n)
+	fmt.Printf("%+v\n", n)
 }
 
 // Respond to an instruction to join a chord ring
