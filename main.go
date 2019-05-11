@@ -60,7 +60,7 @@ func JoinRingCommand(address string) *gabs.Container {
 }
 
 func main() {
-    nodeDirectory = make(map[uint32]string, 1000)
+    nodeDirectory = map[uint32]string {}
     router := mux.NewRouter()
 	router.HandleFunc("/nodes", NodeHandler).Methods("GET", "POST")
 	router.HandleFunc("/nodeDirectory", NodeDirectoryHandler).Methods("GET")
