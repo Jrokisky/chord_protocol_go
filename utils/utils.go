@@ -4,6 +4,7 @@ import (
     "crypto/sha1"
     "math/big"
     "encoding/binary"
+    zmq "github.com/pebbe/zmq4"
 )
 
 func ComputeId(input string) uint32 {
@@ -26,3 +27,16 @@ func ComputeId(input string) uint32 {
     return binary.BigEndian.Uint32(result_big.Bytes())
 }
 
+func SendMessage(msg string, address string) string {
+    context, _ := zmq.NewContext()
+    defer context.Term()
+
+    socket, _ := context.NewSocket(zmq.REQ)
+    defer socket.Close()
+
+    socket.Connect(address)
+    socket.Send(msg, 0)
+
+    reply, _ := socket.Recv(0)
+	return string(reply)
+}
