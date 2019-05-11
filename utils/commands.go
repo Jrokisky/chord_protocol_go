@@ -13,7 +13,7 @@ func JoinRingCommand(sponsoringNode string) *gabs.Container {
 }
 func LeaveRingCommand(mode string) *gabs.Container {
 	jsonObj := gabs.New()
-	jsonObj.Set("leaev-ring", "do")
+	jsonObj.Set("leave-ring", "do")
 	jsonObj.Set(mode, "mode")
 	return jsonObj
 }
