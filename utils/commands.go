@@ -4,6 +4,12 @@ import (
 	"github.com/Jeffail/gabs"
 )
 
+func CreateRingCommand() *gabs.Container {
+	jsonObj := gabs.New()
+	jsonObj.Set("create-ring", "do")
+	return jsonObj
+}
+
 func JoinRingCommand(sponsoringNode string) *gabs.Container {
 	jsonObj := gabs.New()
 	jsonObj.Set("join-ring", "do")
