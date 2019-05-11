@@ -5,8 +5,11 @@ import (
 
 	"encoding/json"
 	"fmt"
+	"encoding/json"
 	"net/http"
 
+	"github.com/Jeffail/gabs"
+	zmq "github.com/pebbe/zmq4"
 	"github.com/gorilla/mux"
 )
 
@@ -24,6 +27,7 @@ func main() {
 	http.ListenAndServe(":8080", router)
 }
 
+// API ENDPOINTS
 func NodeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		json.NewEncoder(w).Encode(nodes)
