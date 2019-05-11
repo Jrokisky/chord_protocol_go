@@ -4,12 +4,12 @@ import (
 	cn "chord/chordNode"
 
 	"fmt"
-    "encoding/json"
-    "net/http"
+	"encoding/json"
+	"net/http"
 
 	"github.com/Jeffail/gabs"
-    zmq "github.com/pebbe/zmq4"
-    "github.com/gorilla/mux"
+	zmq "github.com/pebbe/zmq4"
+	"github.com/gorilla/mux"
 )
 
 // Map of Node ids to addresses
@@ -56,34 +56,33 @@ func JoinRingCommand(address string) *gabs.Container {
 	jsonObj.Set("join-ring", "do")
 	jsonObj.Set(address, "sponsoring-node")
 	return jsonObj
-
 }
 
 func main() {
-    nodeDirectory = map[uint32]string {}
-    router := mux.NewRouter()
+	nodeDirectory = map[uint32]string {}
+	router := mux.NewRouter()
 	router.HandleFunc("/nodes", NodeHandler).Methods("GET", "POST")
 	router.HandleFunc("/nodeDirectory", NodeDirectoryHandler).Methods("GET")
 	http.ListenAndServe(":8080", router)
 }
 
+// API ENDPOINTS
 func NodeHandler(w http.ResponseWriter, r *http.Request) {
-    if r.Method == "GET" {
-       json.NewEncoder(w).Encode(nodes)
-    } else if r.Method == "POST" {
-        node := cn.GenerateRandomNode()
-        // Add node contact information to directory.
-        nodeDirectory[node.ID] = fmt.Sprintf("tcp://%s:%d", node.Address, node.Port)
-        // Add node to global list of nodes.
-        nodes = append(nodes, node)
-        w.WriteHeader(200)
-        json.NewEncoder(w).Encode("success")
-    }
+	if r.Method == "GET" {
+		json.NewEncoder(w).Encode(nodes)
+	} else if r.Method == "POST" {
+		node := cn.GenerateRandomNode()
+		// Add node contact information to directory.
+		nodeDirectory[node.ID] = fmt.Sprintf("tcp://%s:%d", node.Address, node.Port)
+		// Add node to global list of nodes.
+		nodes = append(nodes, node)
+		w.WriteHeader(200)
+		json.NewEncoder(w).Encode("success")
+	}
 }
 
-
 func NodeDirectoryHandler(w http.ResponseWriter, r *http.Request) {
-    if r.Method == "GET" {
-        json.NewEncoder(w).Encode(nodeDirectory)
-    }
+	if r.Method == "GET" {
+		json.NewEncoder(w).Encode(nodeDirectory)
+	}
 }
