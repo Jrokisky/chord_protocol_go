@@ -13,7 +13,7 @@ func JoinRingCommand(sponsoringNode string) *gabs.Container {
 }
 func LeaveRingCommand(mode string) *gabs.Container {
 	jsonObj := gabs.New()
-	jsonObj.Set("join-ring", "do")
+	jsonObj.Set("leaev-ring", "do")
 	jsonObj.Set(mode, "mode")
 	return jsonObj
 }
@@ -37,7 +37,7 @@ func GetCommand(key string, replyTo string) *gabs.Container {
 }
 func InitRingFingersCommand() *gabs.Container {
 	jsonObj := gabs.New()
-	jsonObj.Set("stabilize-ring", "do")
+	jsonObj.Set("init-ring-fingers", "do")
 	return jsonObj
 }
 func StabilizeRingCommand() *gabs.Container {
