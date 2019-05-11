@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"math/big"
 	"math/rand"
+
 	// TODO: remove - debugging
 	"fmt"
 
@@ -45,7 +46,7 @@ func SendMessage(msg string, address string) string {
 
 	// TODO: remove - debugging
 	fmt.Println("address: ", address)
-	socket.Connect(address)
+	socket.Bind(address)
 	socket.Send(msg, 0)
 
 	reply, _ := socket.Recv(0)
