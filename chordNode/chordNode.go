@@ -2,9 +2,8 @@ package chordNode
 
 import (
 	"chord/utils"
-
 	"fmt"
-
+	"strconv"
 	"github.com/Jeffail/gabs"
 	zmq "github.com/pebbe/zmq4"
 )
@@ -167,6 +166,7 @@ func (n ChordNode) Run() {
 	// Main loop, listening for commands
 	for true {
 		msg, _ := socket.Recv(0)
+
 		jsonParsed, _ := gabs.ParseJSON([]byte(msg))
 		fmt.Println(jsonParsed.StringIndent("", "  "))
 		command := jsonParsed.Path("do").String()
@@ -191,4 +191,14 @@ func (n ChordNode) Run() {
 	// 	println("Received", string(reply))
 	// }
 
+}
+
+func AddNodeToDirectory(directory map[uint32]string, node ChordNode) {
+	directory[node.ID] = fmt.Sprintf("tcp://%s:%d", node.Address, node.Port)
+}
+
+func GetAddress(directory map[uint32]string, id string) string {
+	uid, _ := strconv.ParseUint(id, 10, 32)
+	uid32 := uint32(uid)
+	return directory[uid32]
 }

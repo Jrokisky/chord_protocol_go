@@ -5,11 +5,10 @@ import (
 
 	"encoding/json"
 	"fmt"
-	"encoding/json"
 	"net/http"
 
-	"github.com/Jeffail/gabs"
-	zmq "github.com/pebbe/zmq4"
+	//"github.com/Jeffail/gabs"
+	//zmq "github.com/pebbe/zmq4"
 	"github.com/gorilla/mux"
 )
 

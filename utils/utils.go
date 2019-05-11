@@ -5,6 +5,8 @@ import (
 	"encoding/binary"
 	"math/big"
 	"math/rand"
+	// TODO: remove - debugging
+	"fmt"
 
 	zmq "github.com/pebbe/zmq4"
 )
@@ -41,6 +43,8 @@ func SendMessage(msg string, address string) string {
 	socket, _ := context.NewSocket(zmq.REQ)
 	defer socket.Close()
 
+	// TODO: remove - debugging
+	fmt.Println("address: ", address)
 	socket.Connect(address)
 	socket.Send(msg, 0)
 
