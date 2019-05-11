@@ -1,6 +1,7 @@
 package chordNode
 
 import (
+    "chord/utils"
 	"fmt"
 
 	"github.com/Jeffail/gabs"
@@ -31,7 +32,8 @@ type ChordNode struct {
 /*
 Returns a new ChordNode
 */
-func New(id uint32, address string, port int) ChordNode {
+func New(address string, port int) ChordNode {
+    id := utils.ComputeId(fmt.Sprintf("tcp://%s:%d", address, port))
 	n := ChordNode{
 		ID:      id,
 		Address: address,

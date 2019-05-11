@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	zmq "github.com/pebbe/zmq4"
+	"github.com/Jeffail/gabs"
+    zmq "github.com/pebbe/zmq4"
 )
-
-import "github.com/Jeffail/gabs"
 
 type nodeAddress struct {
 	NodeID    uint32
@@ -75,7 +74,8 @@ func JoinRingCommand(address string) *gabs.Container {
 }
 
 func main() {
-	node1 := chordNode.New(1, "127.0.0.1", 5555)
+	node1 := chordNode.New("127.0.0.1", 5555)
+
 	go node1.Run()
 	for {
 		// reader := bufio.NewReader(os.Stdin)
