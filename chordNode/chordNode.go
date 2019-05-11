@@ -21,12 +21,13 @@ type fingerTable struct {
 A node capable of joining and operating a Chord ring
 */
 type ChordNode struct {
-	ID        uint32
-	Successor uint32
-	Table     fingerTable
-	Address   string
-	Port      int
-	InRing    bool
+	ID		uint32
+	Successor	uint32
+	Predecessor	uint32
+	Table		fingerTable
+	Address		string
+	Port		int
+	InRing		bool
 }
 
 /*
@@ -67,9 +68,13 @@ func (n ChordNode) Print() {
 	fmt.Printf("%+v\n", n)
 }
 
+func (n ChordNode) CreateRing(msg *gabs.Container) {
+
+}
+
 // Respond to an instruction to join a chord ring
 func (n ChordNode) JoinRing(msg *gabs.Container) {
-	fmt.Printf("Command received to join ring %s")
+
 }
 
 func (n ChordNode) LeaveRing(msg *gabs.Container) {
@@ -122,6 +127,8 @@ func (n ChordNode) ListItems(msg *gabs.Container) {
 
 func (n ChordNode) ProcessIncomingCommand(command string, msg *gabs.Container) string {
 	switch command {
+	case "create-ring":
+		n.CreateRing(msg)
 	case "join-ring":
 		n.JoinRing(msg)
 	case "init-ring-fingers":
@@ -153,7 +160,6 @@ func (n ChordNode) ProcessIncomingCommand(command string, msg *gabs.Container) s
 }
 
 func (n ChordNode) Run() {
-
 	context, _ := zmq.NewContext()
 	defer context.Term()
 
@@ -173,23 +179,6 @@ func (n ChordNode) Run() {
 		reply := n.ProcessIncomingCommand(command, jsonParsed)
 		socket.Send(reply, 0)
 	}
-
-	/*
-			for request in range(1, 10):
-		    print "Sending request ", request, "..."
-		    socket.send("Hello")
-		    message = socket.recv()
-		    print "Received reply", request, "[", message, "]"
-	*/
-
-	// for i := 0; i < 10; i++ {
-	// 	msg := fmt.Sprintf("Hello %d", i)
-	// 	client.Send([]byte(msg), 0)
-	// 	println("Sending", msg)
-
-	// 	reply, _ := client.Recv(0)
-	// 	println("Received", string(reply))
-	// }
 
 }
 
