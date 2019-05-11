@@ -2,10 +2,10 @@ package chordNode
 
 import (
     "chord/utils"
+
 	"fmt"
 
 	"github.com/Jeffail/gabs"
-
 	zmq "github.com/pebbe/zmq4"
 )
 
@@ -40,6 +40,31 @@ func New(address string, port int) ChordNode {
 		Port:    port}
 	n.Table = fingerTable{Size: 32}
 	return n
+}
+
+/**
+ * Try to find an open port.
+ */
+func GenerateRandomNode() ChordNode {
+    context, _ := zmq.NewContext()
+    defer context.Term()
+
+    socket, _ := context.NewSocket(zmq.REP)
+    defer socket.Close()
+
+    rand_port := utils.GetRandomPort()
+    err := socket.Connect(fmt.Sprintf("tcp://%s:%d", utils.Localhost, rand_port))
+
+    // Error while connecting. Get new port
+    for ;err != nil; {
+        rand_port = utils.GetRandomPort()
+        err = socket.Connect(fmt.Sprintf("tcp://%s:%d", utils.Localhost, rand_port))
+    }
+    return New(utils.Localhost, rand_port)
+}
+
+func (n ChordNode) Print() {
+    fmt.Printf("%+v\n", n)
 }
 
 // Respond to an instruction to join a chord ring
