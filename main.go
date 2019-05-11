@@ -1,37 +1,23 @@
 package main
 
 import (
-	"chord/chordNode"
+	cn "chord/chordNode"
+
 	"fmt"
-	"time"
+    "encoding/json"
+    "net/http"
 
 	"github.com/Jeffail/gabs"
     zmq "github.com/pebbe/zmq4"
+    "github.com/gorilla/mux"
 )
 
-type nodeAddress struct {
-	NodeID    uint32
-	IPAddress string
-	Port      string
-}
+// Map of Node ids to addresses
+var nodeDirectory map[uint32]string
 
-type nodeDirectory struct {
-	nodes []nodeAddress
-}
+// Stores all nodes in the system.
+var nodes []cn.ChordNode
 
-// func SpawnChordNode(address string, port int, joinAddress string, joinNode int) {
-// 	newNode := chordNode.New(rand.Uint32())
-// 	// Check if we are joining an existing ring
-// 	if joinAddress == nil && joinPort == nil {
-
-// 	}
-// 	 // or starting a new ring
-// 	else
-// 	{
-
-// 		}
-
-// }
 
 /*
 Send a message over 0MQ
@@ -74,35 +60,30 @@ func JoinRingCommand(address string) *gabs.Container {
 }
 
 func main() {
-	node1 := chordNode.New("127.0.0.1", 5555)
-
-	go node1.Run()
-	for {
-		// reader := bufio.NewReader(os.Stdin)
-		// fmt.Print("Write here > ")
-		// input, _ := reader.ReadString('\n')
-		// msg := input
-		// fmt.Println(input)
-		joinCommand := JoinRingCommand("127.0.0.1:5555")
-		// fmt.Println(joinCommand.StringIndent("", "  "))
-		SendMessage(node1.Address, node1.Port, joinCommand.String())
-
-		time.Sleep(100 * time.Millisecond)
-
-	}
+    nodeDirectory = map[uint32]string {}
+    router := mux.NewRouter()
+	router.HandleFunc("/nodes", NodeHandler).Methods("GET", "POST")
+	router.HandleFunc("/nodeDirectory", NodeDirectoryHandler).Methods("GET")
+	http.ListenAndServe(":8080", router)
 }
 
-// ringSize := 32 // 2^32
+func NodeHandler(w http.ResponseWriter, r *http.Request) {
+    if r.Method == "GET" {
+       json.NewEncoder(w).Encode(nodes)
+    } else if r.Method == "POST" {
+        node := cn.GenerateRandomNode()
+        // Add node contact information to directory.
+        nodeDirectory[node.ID] = fmt.Sprintf("tcp://%s:%d", node.Address, node.Port)
+        // Add node to global list of nodes.
+        nodes = append(nodes, node)
+        w.WriteHeader(200)
+        json.NewEncoder(w).Encode("success")
+    }
+}
 
-// User input loop, initially no nodes
-// nodes := make(map[uint32]nodeAddress)
-// User adds node
 
-// newNodeAddress := nodeAddress{NodeID: newNode.ID, IpAddress: "localhost", Port: "5555"}
-// // Add node to directory
-// nodes[newNode.ID] = newNodeAddress
-// go newNode.Run()
-
-// fmt.Printf("Server bound to port %s\n", port)
-
-// }
+func NodeDirectoryHandler(w http.ResponseWriter, r *http.Request) {
+    if r.Method == "GET" {
+        json.NewEncoder(w).Encode(nodeDirectory)
+    }
+}
