@@ -16,7 +16,7 @@ import (
 )
 
 // Map of Node ids to addresses
-var nodeDirectory map[uint32]string
+var NodeDirectory map[uint32]string
 
 // Stores all nodes in the system.
 var nodes map[uint32]cn.ChordNode
@@ -48,7 +48,7 @@ func NodeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		json.NewEncoder(w).Encode(nodes)
 	} else if r.Method == "POST" {
-		node := cn.GenerateRandomNode()
+		node := cn.GenerateRandomNode(&NodeDirectory)
 		// Add node contact information to directory.
 		nodeDirectory[node.ID] = fmt.Sprintf("tcp://%s:%d", node.Address, node.Port)
 		// Add node to global map of nodes.

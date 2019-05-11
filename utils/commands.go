@@ -68,13 +68,16 @@ func RingNotifyCommand(replyTo string) *gabs.Container {
 	jsonObj.Set(replyTo, "reply-to")
 	return jsonObj
 }
-func FindRingSuccessorCommand(replyTo string) *gabs.Container {
+
+// {"do": "find-ring-successor", "id": id, "reply-to": address}
+func FindRingSuccessorCommand(id uint32, replyTo string) *gabs.Container {
 	jsonObj := gabs.New()
 	jsonObj.Set("find-ring-successor", "do")
+	jsonObj.Set(id, "id")
 	jsonObj.Set(replyTo, "reply-to")
 	return jsonObj
 }
-func FindRingPredecessorCommand(replyTo string) *gabs.Container {
+func FindRingPredecessorCommand(id uint32, replyTo string) *gabs.Container {
 	jsonObj := gabs.New()
 	jsonObj.Set("find-ring-predecessor", "do")
 	jsonObj.Set(replyTo, "reply-to")

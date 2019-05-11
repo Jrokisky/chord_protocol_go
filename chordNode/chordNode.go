@@ -1,7 +1,9 @@
-package chordNode
+package chordnode
 
 import (
 	"chord/utils"
+	"strconv"
+
 	"fmt"
 	"strconv"
 	"github.com/Jeffail/gabs"
@@ -21,47 +23,51 @@ type fingerTable struct {
 A node capable of joining and operating a Chord ring
 */
 type ChordNode struct {
-	ID		uint32
-	Successor	uint32
-	Predecessor	uint32
-	Table		fingerTable
-	Address		string
-	Port		int
-	InRing		bool
+	ID          uint32
+	Predecessor *uint32
+	Successor   *uint32
+	Table       fingerTable
+	Address     string
+	Port        int
+	InRing      bool
+	Data        map[string]string
+	Directory   *map[uint32]string
 }
 
 /*
 Returns a new ChordNode
 */
-func New(address string, port int) ChordNode {
+func New(address string, port int, directory *map[uint32]string) ChordNode {
 	id := utils.ComputeId(fmt.Sprintf("tcp://%s:%d", address, port))
 	n := ChordNode{
 		ID:      id,
 		Address: address,
 		Port:    port}
 	n.Table = fingerTable{Size: 32}
+	n.Data = make(map[string]string)
+	n.Directory = directory
 	return n
 }
 
 /**
  * Try to find an open port.
  */
-func GenerateRandomNode() ChordNode {
+func GenerateRandomNode(directory *map[uint32]string) ChordNode {
 	context, _ := zmq.NewContext()
 	defer context.Term()
 
 	socket, _ := context.NewSocket(zmq.REP)
 	defer socket.Close()
 
-	rand_port := utils.GetRandomPort()
-	err := socket.Connect(fmt.Sprintf("tcp://%s:%d", utils.Localhost, rand_port))
+	randPort := utils.GetRandomPort()
+	err := socket.Connect(fmt.Sprintf("tcp://%s:%d", utils.Localhost, randPort))
 
 	// Error while connecting. Get new port
-	for ;err != nil; {
-		rand_port = utils.GetRandomPort()
-		err = socket.Connect(fmt.Sprintf("tcp://%s:%d", utils.Localhost, rand_port))
+	for err != nil {
+		randPort = utils.GetRandomPort()
+		err = socket.Connect(fmt.Sprintf("tcp://%s:%d", utils.Localhost, randPort))
 	}
-	return New(utils.Localhost, rand_port)
+	return New(utils.Localhost, randPort, directory)
 }
 
 func (n ChordNode) Print() {
@@ -101,8 +107,31 @@ func (n ChordNode) GetRingFingers(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) FindRingSuccessor(msg *gabs.Container) {
-
+// {"do": "find-ring-successor", "id": id, "reply-to": address}
+func (n ChordNode) FindRingSuccessor(msg *gabs.Container) *gabs.Container {
+	var id uint32
+	id64, err := strconv.ParseUint(msg.Path("id").String(), 10, 32)
+	id = uint32(id64) // TODO: This is stupid
+	replyTo := msg.Path("reply-to").String()
+	var result uint32
+	// Check if this key should belong to this node
+	if n.Predecessor != nil && id > *n.Predecessor && id < n.ID {
+		result = n.ID // Return this node's ID, since it's the successor of the given ID
+	} else if id > n.ID && id < *n.Successor {
+		result = *n.Successor
+	} else {
+		// TODO is there a case where successor is self?
+		// Make zmq call to successor
+		request := utils.FindRingPredecessorCommand(id, n.Address).String()
+		directory := *n.Directory
+		successor := *n.Successor
+		reply := utils.SendMessage(request, directory[successor]) // TODO This is BS why can't I nest them
+		result = jsonParsed.Path("id").String()
+	}
+	jsonParsed, _ := gabs.ParseJSON([]byte(reply))
+	jsonObj := gabs.New()
+	jsonObj.Set(id, "id")
+	return jsonobj
 }
 
 func (n ChordNode) FindRingPredecessor(msg *gabs.Container) {
@@ -110,7 +139,12 @@ func (n ChordNode) FindRingPredecessor(msg *gabs.Container) {
 }
 
 func (n ChordNode) Put(msg *gabs.Container) {
-
+	key := msg.Path("data").Path("key").String()
+	value := msg.Path("data").Path("value").String()
+	replyTo := msg.Path("reply-to").String()
+	id := utils.ComputeId(key)
+	fmt.Printf("Storing key '%s' with value '%s' at hash %d", key, value, id)
+	return key
 }
 
 func (n ChordNode) Get(msg *gabs.Container) {
