@@ -1,12 +1,13 @@
 package main
 
 import (
-	"chord/chordNode"
+	chordnode "chord/chordNode"
 	"chord/utils"
 	"fmt"
 	"strconv"
 	"strings"
 	"testing"
+
 	"github.com/Jeffail/gabs"
 )
 
@@ -19,12 +20,12 @@ func TestCreateRing(t *testing.T) {
 
 	sourceAddress, _ := node1.GetSocketAddress()
 	createCommand := utils.CreateRingCommand()
-	fmt.Println(createCommand.String())
-	reply := utils.SendMessage(createCommand.String(), sourceAddress)
+	fmt.Println(createCommand)
+	reply := utils.SendMessage(createCommand, sourceAddress)
 	jsonParsed, _ := gabs.ParseJSON([]byte(reply))
 	status, _ := strconv.Unquote(jsonParsed.Path("status").String())
 	fmt.Println("InRing - expected: true actual:", node1.InRing)
-	if (strings.Compare(status, "ok") != 0) {
+	if strings.Compare(status, "ok") != 0 {
 		t.Errorf("status = %s", status)
 	}
 }
@@ -41,13 +42,13 @@ func TestJoinRing(t *testing.T) {
 
 	sourceAddress, _ := node1.GetSocketAddress()
 	joinCommand := utils.JoinRingCommand(sourceAddress)
-	fmt.Println(joinCommand.String())
+	fmt.Println(joinCommand)
 	destAddress, _ := node2.GetSocketAddress()
-	reply := utils.SendMessage(joinCommand.String(), destAddress)
+	reply := utils.SendMessage(joinCommand, destAddress)
 	jsonParsed, _ := gabs.ParseJSON([]byte(reply))
 	status, _ := strconv.Unquote(jsonParsed.Path("status").String())
 	fmt.Println("InRing - expected: true actual:", node2.InRing)
-	if (strings.Compare(status, "ok") != 0) {
+	if strings.Compare(status, "ok") != 0 {
 		t.Errorf("status = %s", status)
 	}
 }
@@ -64,25 +65,25 @@ func TestLeaveRing(t *testing.T) {
 
 	sourceAddress, _ := node1.GetSocketAddress()
 	joinCommand := utils.JoinRingCommand(sourceAddress)
-	fmt.Println(joinCommand.String())
+	fmt.Println(joinCommand)
 	destAddress, _ := node2.GetSocketAddress()
-	utils.SendMessage(joinCommand.String(), destAddress)
+	utils.SendMessage(joinCommand, destAddress)
 
 	leaveCommandI := utils.LeaveRingCommand("immediately")
 	leaveCommandO := utils.LeaveRingCommand("orderly")
-	reply := utils.SendMessage(leaveCommandI.String(), destAddress)
+	reply := utils.SendMessage(leaveCommandI, destAddress)
 	jsonParsed, _ := gabs.ParseJSON([]byte(reply))
 	status, _ := strconv.Unquote(jsonParsed.Path("status").String())
 	fmt.Println("InRing - expected: false actual:", node2.InRing)
-	if (strings.Compare(status, "ok") != 0) {
+	if strings.Compare(status, "ok") != 0 {
 		t.Errorf("status = %s", status)
 	}
 
-	reply = utils.SendMessage(leaveCommandO.String(), sourceAddress)
+	reply = utils.SendMessage(leaveCommandO, sourceAddress)
 	jsonParsed, _ = gabs.ParseJSON([]byte(reply))
 	status, _ = strconv.Unquote(jsonParsed.Path("status").String())
 	fmt.Println("InRing - expected: false actual:", node1.InRing)
-	if (strings.Compare(status, "ok") != 0) {
+	if strings.Compare(status, "ok") != 0 {
 		t.Errorf("status = %s", status)
 	}
 }

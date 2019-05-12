@@ -4,33 +4,33 @@ import (
 	"github.com/Jeffail/gabs"
 )
 
-func CreateRingCommand() *gabs.Container {
+func CreateRingCommand() string {
 	jsonObj := gabs.New()
 	jsonObj.Set("create-ring", "do")
-	return jsonObj
+	return jsonObj.String()
 }
 
-func JoinRingCommand(sponsoringNode string) *gabs.Container {
+func JoinRingCommand(sponsoringNode string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("join-ring", "do")
 	jsonObj.Set(sponsoringNode, "sponsoring-node")
-	return jsonObj
+	return jsonObj.String()
 
 }
-func LeaveRingCommand(mode string) *gabs.Container {
+func LeaveRingCommand(mode string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("leave-ring", "do")
 	jsonObj.Set(mode, "mode")
-	return jsonObj
+	return jsonObj.String()
 }
 
-func PutCommand(key string, value string, replyTo string) *gabs.Container {
+func PutCommand(key string, value string, replyTo string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("put", "do")
 	jsonObj.Set(key, "data", "key")
 	jsonObj.Set(value, "data", "value")
 	jsonObj.Set(replyTo, "reply-to")
-	return jsonObj
+	return jsonObj.String()
 
 }
 

@@ -2,9 +2,10 @@ package chordnode
 
 import (
 	"chord/utils"
-	"strconv"
 	"fmt"
+	"strconv"
 	"strings"
+
 	"github.com/Jeffail/gabs"
 	zmq "github.com/pebbe/zmq4"
 )
@@ -96,12 +97,12 @@ func (n ChordNode) LeaveRing(msg *gabs.Container) string {
 	mode := msg.Path("mode").String()
 
 	// Leave gracefully and inform others
-	if (strings.Compare(mode, "orderly") == 0) {
+	if strings.Compare(mode, "orderly") == 0 {
 		// notify predecessor and successor
 		// transfer keys to its successor
 		successorAddress, present := (*n.Directory)[*n.Successor]
 		myAddress, _ := n.GetSocketAddress()
-		if (!present) {
+		if !present {
 			// TODO:
 			// Look in finger table // find closest alive successor
 			fmt.Println("Finger table entry, find closest alive successor")
@@ -110,7 +111,7 @@ func (n ChordNode) LeaveRing(msg *gabs.Container) string {
 			for k, v := range n.Data {
 				putCommand := utils.PutCommand(k, v, myAddress)
 				// TODO: Verify reply below?
-				reply := utils.SendMessage(putCommand.String(), successorAddress)
+				reply := utils.SendMessage(putCommand, successorAddress)
 				fmt.Println("k:%s v:%s reply:%s", k, v, reply)
 			}
 		}
