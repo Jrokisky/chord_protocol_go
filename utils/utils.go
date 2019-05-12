@@ -7,6 +7,7 @@ import (
 	"math/rand"
 	"strconv"
 	"os"
+	"errors"
 
 	// TODO: remove - debugging
 	"fmt"
@@ -18,6 +19,7 @@ import (
 const MinPort = 1025
 const MaxPort = 47808
 const Localhost = "127.0.0.1"
+const ERROR_MSG = "NORESPONSE"
 
 func ComputeId(input string) uint32 {
 	// Hash input
@@ -39,7 +41,7 @@ func ComputeId(input string) uint32 {
 	return binary.BigEndian.Uint32(result_big.Bytes())
 }
 
-func SendMessage(msg string, address string) string {
+func SendMessage(msg string, address string) (string, error) {
 	context, _ := zmq.NewContext()
 	defer context.Term()
 
@@ -51,10 +53,10 @@ func SendMessage(msg string, address string) string {
 	socket.Send(msg, 0)
 
 	reply, err := socket.Recv(0)
-	if err != nil {
-		return err.Error()
+	if reply == ERROR_MSG || err != nil {
+		return "", errors.New("Dropped Message")
 	} else {
-		return string(reply)
+		return string(reply), nil
 	}
 }
 

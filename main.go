@@ -113,7 +113,7 @@ func NodeJoinHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		cmd = utils.JoinRingCommand(sponsorNodeAddr)
 	}
-	response := utils.SendMessage(cmd, address)
+	response, _ := utils.SendMessage(cmd, address)
 
 	w.WriteHeader(200)
 	json.NewEncoder(w).Encode(response)
