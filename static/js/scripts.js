@@ -12,6 +12,10 @@ $(document).ready(function() {
 				e.preventDefault();
 				$.post($(this)[0].href);
 			});
+			$(".leave-link").click(function(e) {
+				e.preventDefault();
+				$.post($(this)[0].href);
+			});
 		})
 	}, 1000);
 });
@@ -146,6 +150,28 @@ function drawNodesTable(nodes) {
     			var join_link_td = document.createElement('td');
     			join_link_td.appendChild(join_link);
     			tr.appendChild(join_link_td);
+		} else {
+			var leave_link_container = document.createElement('div')
+
+			var leave_link_orderly = document.createElement('a');
+			var leave_link_orderly_text  = document.createTextNode("Leave Orderly");
+			leave_link_orderly.appendChild(leave_link_orderly_text);
+			leave_link_orderly.title = "Leave Orderly";
+			leave_link_orderly.href = "http://localhost:8080/nodes/" + node.ID + "/leave/orderly";
+			leave_link_orderly.className = "leave-link";
+			leave_link_container.appendChild(leave_link_orderly)
+
+			var leave_link = document.createElement('a');
+			var leave_link_text  = document.createTextNode("Leave");
+			leave_link.appendChild(leave_link_text);
+			leave_link.title = "Leave";
+			leave_link.href = "http://localhost:8080/nodes/" + node.ID + "/leave/rude";
+			leave_link.className = "leave-link";
+			leave_link_container.appendChild(leave_link)
+
+    			var leave_link_td = document.createElement('td');
+    			leave_link_td.appendChild(leave_link_container);
+    			tr.appendChild(leave_link_td);
 		}
 
 		table.appendChild(tr);

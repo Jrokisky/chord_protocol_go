@@ -108,10 +108,13 @@ func (n *ChordNode) JoinRing(msg *gabs.Container) string {
 		jsonObj.Set("failure", "error")
 	} else {
 		jsonParsed, _ := gabs.ParseJSON([]byte(response_from_sponsor))
-		id := utils.ParseToUInt32(jsonParsed.Path("id").String())
+		id, _ := utils.ParseToUInt32(jsonParsed.Path("id").String())
 
 		n.mux.Lock()
 		n.Predecessor = nil
+		if n.Successor == nil {
+			n.Successor = new(uint32)
+		}
 		*(n.Successor) = id
 		n.mux.Unlock()
 
@@ -129,13 +132,22 @@ func (n *ChordNode) GetOwnAddress() string {
 }
 
 func (n *ChordNode) LeaveRing(msg *gabs.Container) string {
-	mode := msg.Path("mode").String()
+	mode := msg.Path("mode").Data().(string)
+	utils.Debug("[LeaveRing: %s] leaving with mode: %s\n", fmt.Sprint(n.ID), mode)
 
 	// Leave gracefully and inform others
 	if strings.Compare(mode, "orderly") == 0 {
 		// notify predecessor and successor
-		// transfer keys to its successor
-		successorAddress, present := (*n.Directory)[*n.Successor]
+		successorAddress, present := (*n.Directory)[*(n.Successor)]
+		orderlyLeaveMsg := utils.NotifyOrderlyLeaveCommand(n.ID, n.Predecessor, n.Successor)
+		utils.Debug("[LeavRing: %s] Sending leave msg: %s to successor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(*(n.Successor)), orderlyLeaveMsg)
+		_, _ = utils.SendMessage(orderlyLeaveMsg, successorAddress)
+		if (n.Predecessor != nil) {
+			predecessorAddress, _ := (*n.Directory)[*(n.Predecessor)]
+			utils.Debug("[LeavRing: %s] Sending leave msg: %s to predecessor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(*(n.Predecessor)), orderlyLeaveMsg)
+			_, _ = utils.SendMessage(orderlyLeaveMsg, predecessorAddress)
+		}
+
 		myAddress, _ := n.GetSocketAddress()
 		if !present {
 			// TODO:
@@ -155,17 +167,12 @@ func (n *ChordNode) LeaveRing(msg *gabs.Container) string {
 			}
 		}
 
-		// TODO: How do we communicate node updates like this? stabilization handles this?
-		// predecessor removes n from successor list
-		// add last node in n's successor list to predecessor's list
-		// successor will replace predecessor with n's predecessor
 
 	}
 
-	// Case for immediate: Just leave the party
-	// remove ourselves from the directory?
-	delete(*n.Directory, n.ID)
 	n.InRing = false
+	n.Predecessor = nil
+	n.Successor = nil
 
 	jsonObj := gabs.New()
 	jsonObj.Set("ok", "status")
@@ -231,11 +238,32 @@ func (n *ChordNode) FindRingSuccessor(id uint32) (uint32, error) {
 			return 0, errors.New("Error finding Ring Successor")
 		} else {
 			jsonParsed, _ := gabs.ParseJSON([]byte(response_from_successor))
-			id := utils.ParseToUInt32(jsonParsed.Path("id").String())
+			id, _ := utils.ParseToUInt32(jsonParsed.Path("id").String())
 			result = id
 		}
 	}
 	return result, nil
+}
+
+func (n *ChordNode) ProcessOrderlyLeave(jsonParsed *gabs.Container) string {
+	leaver, _ := utils.ParseToUInt32(jsonParsed.Path("leaver").String())
+	succ, succ_err := utils.ParseToUInt32(jsonParsed.Path("successor").String())
+	pred, pred_err := utils.ParseToUInt32(jsonParsed.Path("predecessor").String())
+
+	if (*(n.Successor) == leaver) && (succ_err == nil) {
+		// Replace n's successor (since it's leaving) with the leaving node's successor.
+		n.mux.Lock()
+		*(n.Successor) = succ
+		n.mux.Unlock()
+		return "Successor updated with Leaver's successor"
+	} else if (n.Predecessor != nil && *(n.Predecessor) == leaver) && (pred_err == nil){
+		// Replace n's predecessor (since it's leaving) with the leaving node's predecessor.
+		n.mux.Lock()
+		*(n.Predecessor) = pred
+		n.mux.Unlock()
+		return "Precessor updated with Leaver's successor"
+	}
+	return "No changes made"
 }
 
 func (n ChordNode) FindRingPredecessor(id uint32) {
@@ -302,10 +330,11 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 		n.StabilizeRing()
 		return "", nil
 	case "leave-ring":
-		// TODO: Should we pass string or json into leavring?
-		//mode := jsonParsed.Path("mode").String()
 		n.LeaveRing(jsonParsed)
 		return "", nil
+	case "notify-orderly-leave":
+		result := n.ProcessOrderlyLeave(jsonParsed)
+		return result, nil
 	case "ring-notify":
 		n.RingNotify()
 		return "", nil
@@ -313,7 +342,7 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 		n.GetRingFingers()
 		return "", nil
 	case "find-ring-successor":
-		id := utils.ParseToUInt32(jsonParsed.Path("id").String())
+		id, _ := utils.ParseToUInt32(jsonParsed.Path("id").String())
 		result, err := n.FindRingSuccessor(id)
 		if err != nil {
 			return "", err
@@ -323,7 +352,7 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 			return jsonObj.String(), nil
 		}
 	case "find-ring-predecessor":
-		id := utils.ParseToUInt32(jsonParsed.Path("id").String())
+		id, _ := utils.ParseToUInt32(jsonParsed.Path("id").String())
 		n.FindRingPredecessor(id)
 		return "", nil
 	case "put":

@@ -24,6 +24,19 @@ func LeaveRingCommand(mode string) string {
 	return jsonObj.String()
 }
 
+func NotifyOrderlyLeaveCommand(leaver uint32, pred *uint32, succ *uint32) string {
+	jsonObj := gabs.New()
+	jsonObj.Set("notify-orderly-leave", "do")
+	jsonObj.Set(leaver, "leaver")
+	if (pred != nil) {
+		jsonObj.Set(*pred, "predecessor")
+	}
+	if (succ != nil) {
+		jsonObj.Set(*succ, "successor")
+	}
+	return jsonObj.String()
+}
+
 func PutCommand(key string, value string, replyTo string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("put", "do")

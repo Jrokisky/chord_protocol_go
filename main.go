@@ -6,10 +6,10 @@ import (
 
 	"encoding/json"
 	"errors"
-	"fmt"
-	"io/ioutil"
 	"net/http"
 	"strconv"
+	"fmt"
+	"io/ioutil"
 
 	"github.com/gorilla/mux"
 )
@@ -38,12 +38,11 @@ func main() {
 	router := mux.NewRouter()
 	router.HandleFunc("/visualize", VizHandler).Methods("GET")
 	fs := http.FileServer(http.Dir("./chord/static"))
-	//router.HandleFunc("/visualize/scripts.js", VizJSHandler).Methods("GET")
 	router.PathPrefix("/js/").Handler(fs)
 	router.PathPrefix("/css/").Handler(fs)
-	//router.HandleFunc("/visualize/styles.css", VizCSSHandler).Methods("GET")
 	router.HandleFunc("/nodes", NodeHandler).Methods("GET", "POST")
 	router.HandleFunc("/nodes/{id}/join", NodeJoinHandler).Methods("POST")
+	router.HandleFunc("/nodes/{id}/leave/{mode}", NodeLeaveHandler).Methods("POST")
 	router.HandleFunc("/nodeDirectory", NodeDirectoryHandler).Methods("GET")
 	http.ListenAndServe(":8080", router)
 }
@@ -65,37 +64,16 @@ func NodeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// WIP
 func VizHandler(w http.ResponseWriter, r *http.Request) {
 	f, err := ioutil.ReadFile("chord/static/page.html")
 	if err != nil {
-		json.NewEncoder(w).Encode(err)
+	json.NewEncoder(w).Encode(err)
 	} else {
 		w.Header().Set("Content-type", "text/html")
 		fmt.Fprintf(w, string(f))
 	}
 }
 
-// WIP
-func VizJSHandler(w http.ResponseWriter, r *http.Request) {
-	f, err := ioutil.ReadFile("chord/static/scripts.js")
-	if err != nil {
-		json.NewEncoder(w).Encode(err)
-	} else {
-		w.Header().Set("Content-type", "text/javascript")
-		fmt.Fprintf(w, string(f))
-	}
-}
-
-func VizCSSHandler(w http.ResponseWriter, r *http.Request) {
-	f, err := ioutil.ReadFile("chord/static/styles.css")
-	if err != nil {
-		json.NewEncoder(w).Encode(err)
-	} else {
-		w.Header().Set("Content-type", "text/css")
-		fmt.Fprintf(w, string(f))
-	}
-}
 
 func NodeJoinHandler(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
@@ -118,6 +96,21 @@ func NodeJoinHandler(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(200)
 	json.NewEncoder(w).Encode(response)
 
+}
+
+func NodeLeaveHandler(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	id, err := strconv.ParseUint(params["id"], 10, 32)
+	if err != nil {
+		// todo error handling
+	}
+	mode := params["mode"]
+	address := NodeDirectory[uint32(id)]
+	cmd := utils.LeaveRingCommand(mode)
+	response, _ := utils.SendMessage(cmd, address)
+
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(response)
 }
 
 func NodeDirectoryHandler(w http.ResponseWriter, r *http.Request) {
