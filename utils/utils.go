@@ -46,7 +46,7 @@ func SendMessage(msg string, address string) string {
 	socket, _ := context.NewSocket(zmq.REQ)
 	defer socket.Close()
 
-	Debug("[SNDMSG] Sendig msg: %s to address: %s\n", msg, address)
+	Debug("[SendMessage] Sendig msg: %s to address: %s\n", msg, address)
 	socket.Bind(address)
 	socket.Send(msg, 0)
 

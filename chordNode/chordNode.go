@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"sync"
 
 	"github.com/Jeffail/gabs"
 	zmq "github.com/pebbe/zmq4"
@@ -24,15 +25,16 @@ type fingerTable struct {
 A node capable of joining and operating a Chord ring
 */
 type ChordNode struct {
-	ID          uint32
-	Predecessor *uint32
-	Successor   *uint32
-	Table       fingerTable
-	Address     string
-	Port        int
-	InRing      bool
-	Data        map[string]string
-	Directory   *map[uint32]string
+	ID		uint32
+	Predecessor	*uint32
+	Successor	*uint32
+	Table		fingerTable
+	Address		string
+	Port		int
+	InRing		bool
+	Data		map[string]string
+	Directory	*map[uint32]string
+	mux		sync.Mutex
 }
 
 /*
@@ -80,10 +82,13 @@ func (n ChordNode) Print() {
 
 // Respond to an instruction to join a chord ring
 func (n *ChordNode) CreateRing(msg *gabs.Container) string {
+	n.mux.Lock()
 	n.Predecessor = nil
 	n.Successor = new(uint32)
 	*(n.Successor) = n.ID
 	n.InRing = true
+	n.mux.Unlock()
+
 	jsonObj := gabs.New()
 	jsonObj.Set("ok", "status")
 	msg.Merge(jsonObj)
@@ -94,20 +99,23 @@ func (n *ChordNode) CreateRing(msg *gabs.Container) string {
 // Respond to an instruction to join a chord ring
 func (n *ChordNode) JoinRing(msg *gabs.Container) string {
 	utils.Debug("[JoinRing] msg: %s\n", msg.String())
-	n.Predecessor = nil
 	sponsorAddress := msg.Path("sponsoring-node").Data().(string)
 	newmsg := utils.FindRingSuccessorCommand(n.ID, n.GetOwnAddress())
 	response_from_sponsor := utils.SendMessage(newmsg, sponsorAddress)
 	jsonParsed, _ := gabs.ParseJSON([]byte(response_from_sponsor))
 	id := utils.ParseToUInt32(jsonParsed.Path("id").String())
+
+	n.mux.Lock()
+	n.Predecessor = nil
 	*(n.Successor) = id
+	n.mux.Unlock()
+
 	n.InRing = true
 	jsonObj := gabs.New()
 	jsonObj.Set("ok", "status")
 	msg.Merge(jsonObj)
 
 	return msg.String()
-
 }
 
 func (n *ChordNode) GetOwnAddress() string {
@@ -183,20 +191,26 @@ func (n *ChordNode) FindRingSuccessor(id uint32) uint32 {
 	if n.Predecessor == nil && *(n.Successor) == n.ID {
 		utils.Debug("\t[FindRingSuccessor] Adding second node to ring\n")
 		// First node in the Chord, so now there's only two nodes in chord.
+		n.mux.Lock()
 		n.Predecessor = new(uint32)
 		*(n.Predecessor) = id
 		n.Successor = new(uint32)
 		*(n.Successor) = id
+		n.mux.Unlock()
 		result = n.ID
 	} else if(utils.IsBetween(n.ID, *(n.Successor), id)) {
+		n.mux.Lock()
 		result = *(n.Successor)
 		*(n.Successor) = id
+		n.mux.Unlock()
 	} else if (n.Predecessor != nil) && (utils.IsBetween(*(n.Predecessor), n.ID, id)) {
+		n.mux.Lock()
 		result = n.ID
 		if (n.Predecessor == nil) {
 			n.Predecessor = new(uint32)
 		}
 		*(n.Predecessor) = id
+		n.mux.Unlock()
 	} else {
 		// Recursively ask successors.
 		request := utils.FindRingSuccessorCommand(id, n.GetOwnAddress())
@@ -329,23 +343,20 @@ func (n *ChordNode) Run() {
 
 	socket, _ := context.NewSocket(zmq.REP)
 	defer socket.Close()
-
 	socket.Connect(fmt.Sprintf("tcp://%s:%d", n.Address, n.Port))
-	utils.Debug("[ChordRun] Client bound to port %sn", fmt.Sprint(n.Port))
 
-	// Main loop, listening for commands
-	for true {
+	utils.Debug("[ChordRun: %s] Client bound to port %s\n", fmt.Sprint(n.ID), fmt.Sprint(n.Port))
+
+	for {
 		msg, err := socket.Recv(0)
 		if err != nil {
 			utils.Debug(err.Error())
 		}
 
-		utils.Debug("\t[ChordRun] msg received: %s\n", (string)(msg))
+		utils.Debug("[ChordRun: %s] msg received: %s\n", fmt.Sprint(n.ID), (string)(msg))
 		reply := n.ProcessIncomingCommand(msg)
 		socket.Send(reply, 0)
-		utils.Debug("\t[ChordRun] Replied to message with: %s\n", reply)
 	}
-
 }
 
 func (n ChordNode) AddNodeToDirectory() {
