@@ -213,6 +213,7 @@ func (n *ChordNode) FindRingSuccessor(id uint32) uint32 {
 		n.mux.Unlock()
 	} else {
 		// Recursively ask successors.
+		utils.Debug("\t[FindRingSuccessor: %s] Passing message to successor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(*(n.Successor)))
 		request := utils.FindRingSuccessorCommand(id, n.GetOwnAddress())
 		directory := *n.Directory
 		successor := *(n.Successor)
