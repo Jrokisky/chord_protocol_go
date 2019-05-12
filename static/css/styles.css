@@ -1,0 +1,19 @@
+.container {
+	position: fixed;
+}
+
+#node-list-conainer {
+	width: 25%;
+	height: 100%;
+	left: 0;
+}
+
+#chart-container{
+	height: 100%;
+	width: 75%;
+	right: 0;
+}
+
+#chart-canvas {
+	height: 900px;
+}

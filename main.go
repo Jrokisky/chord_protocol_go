@@ -12,14 +12,15 @@ import (
 	"strconv"
 
 	"github.com/gorilla/mux"
-	zmq "github.com/pebbe/zmq4"
 )
+
+const DEBUG = true
 
 // Map of Node ids to addresses
 var NodeDirectory map[uint32]string
 
 // Stores all nodes in the system.
-var nodes map[uint32]cn.ChordNode
+var nodes map[uint32]*cn.ChordNode
 var nodeIds []uint32
 
 func getSponsoringNodeAddress() (string, error) {
@@ -33,12 +34,16 @@ func getSponsoringNodeAddress() (string, error) {
 
 func main() {
 	NodeDirectory = map[uint32]string{}
-	nodes = map[uint32]cn.ChordNode{}
+	nodes = map[uint32]*cn.ChordNode{}
 	router := mux.NewRouter()
 	router.HandleFunc("/visualize", VizHandler).Methods("GET")
-	router.HandleFunc("/visualize/scripts.js", VizJSHandler).Methods("GET")
+	fs := http.FileServer(http.Dir("./chord/static"))
+	//router.HandleFunc("/visualize/scripts.js", VizJSHandler).Methods("GET")
+	router.PathPrefix("/js/").Handler(fs)
+	router.PathPrefix("/css/").Handler(fs)
+	//router.HandleFunc("/visualize/styles.css", VizCSSHandler).Methods("GET")
 	router.HandleFunc("/nodes", NodeHandler).Methods("GET", "POST")
-	router.HandleFunc("/nodes/{id}join", NodeJoinHandler).Methods("POST")
+	router.HandleFunc("/nodes/{id}/join", NodeJoinHandler).Methods("POST")
 	router.HandleFunc("/nodeDirectory", NodeDirectoryHandler).Methods("GET")
 	http.ListenAndServe(":8080", router)
 }
@@ -50,13 +55,13 @@ func NodeHandler(w http.ResponseWriter, r *http.Request) {
 	} else if r.Method == "POST" {
 		node := cn.GenerateRandomNode(&NodeDirectory)
 		// Add node contact information to directory.
-		NodeDirectory[node.ID] = fmt.Sprintf("tcp://%s:%d", node.Address, node.Port)
+		NodeDirectory[node.ID] = node.GetOwnAddress()
 		// Add node to global map of nodes.
 		nodes[node.ID] = node
 		nodeIds = append(nodeIds, node.ID)
 		go node.Run()
 		w.WriteHeader(200)
-		json.NewEncoder(w).Encode("success")
+		json.NewEncoder(w).Encode(node.ID)
 	}
 }
 
@@ -82,6 +87,16 @@ func VizJSHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func VizCSSHandler(w http.ResponseWriter, r *http.Request) {
+	f, err := ioutil.ReadFile("chord/static/styles.css")
+	if err != nil {
+		json.NewEncoder(w).Encode(err)
+	} else {
+		w.Header().Set("Content-type", "text/css")
+		fmt.Fprintf(w, string(f))
+	}
+}
+
 func NodeJoinHandler(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	id, err := strconv.ParseUint(params["id"], 10, 32)
@@ -98,7 +113,7 @@ func NodeJoinHandler(w http.ResponseWriter, r *http.Request) {
 	} else {
 		cmd = utils.JoinRingCommand(sponsorNodeAddr)
 	}
-	response := SendCommand(address, cmd)
+	response := utils.SendMessage(cmd, address)
 
 	w.WriteHeader(200)
 	json.NewEncoder(w).Encode(response)
@@ -111,15 +126,3 @@ func NodeDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func SendCommand(target string, data string) string {
-	context, _ := zmq.NewContext()
-	defer context.Term()
-
-	socket, _ := context.NewSocket(zmq.REQ)
-	defer socket.Close()
-
-	socket.Connect(target)
-	socket.Send(data, 0)
-	response, _ := socket.Recv(0)
-	return response
-}

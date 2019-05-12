@@ -6,6 +6,7 @@ import (
 	"math/big"
 	"math/rand"
 	"strconv"
+	"os"
 
 	// TODO: remove - debugging
 	"fmt"
@@ -45,13 +46,16 @@ func SendMessage(msg string, address string) string {
 	socket, _ := context.NewSocket(zmq.REQ)
 	defer socket.Close()
 
-	// TODO: remove - debugging
-	fmt.Println("address: ", address)
+	Debug("[SNDMSG] Sendig msg: %s to address: %s\n", msg, address)
 	socket.Bind(address)
 	socket.Send(msg, 0)
 
-	reply, _ := socket.Recv(0)
-	return string(reply)
+	reply, err := socket.Recv(0)
+	if err != nil {
+		return err.Error()
+	} else {
+		return string(reply)
+	}
 }
 
 func GetRandomPort() int {
@@ -62,4 +66,45 @@ func ParseToUInt32(input string) uint32 {
 	result64, _ := strconv.ParseUint(input, 10, 32) // TODO add error checking
 	result := uint32(result64)
 	return result
+}
+
+func Debug(log string, args ...string) {
+	typed_args := make([]interface{}, len(args))
+	for i, v := range args {
+		typed_args[i] = v
+	}
+	fmt.Fprintf(os.Stderr, log, typed_args...)
+}
+
+func IsBetween(start uint32, end uint32, val uint32) bool {
+	//---------------------------------------
+	// s = start  e = end   v = value
+	//     __v___|___e_
+	//    /      0     \
+	//   s              \
+	//  /                \
+	if (start > end) && (start < val) && (val > end) {
+		return true
+	}
+
+	//---------------------------------------
+	// s = start  e = end   v = value
+	//     ______|_v_e_
+	//    /      0     \
+	//   s              \
+	//  /                \
+	if (start > end) && (start > val) && (val < end) {
+		return true
+	}
+
+	//----------------------------------------
+	// s = start  e = end   v = value
+	//  \                /
+	//   e              /
+	//    \___v______s_/
+	if (end > start) && (val > start) && (val < end) {
+		return true
+	}
+
+	return false
 }
