@@ -5,24 +5,84 @@ import (
 	"chord/utils"
 	"fmt"
 	"strconv"
+	"strings"
 	"testing"
+	"github.com/Jeffail/gabs"
 )
 
 func TestCreateRing(t *testing.T) {
 	nodeDirectory := map[uint32]string{}
-	node1 := chordNode.GenerateRandomNode()
-	node2 := chordNode.GenerateRandomNode()
-	chordNode.AddNodeToDirectory(nodeDirectory, node1)
-	chordNode.AddNodeToDirectory(nodeDirectory, node2)
+	node1 := chordnode.GenerateRandomNode(&nodeDirectory)
+	node1.AddNodeToDirectory()
+
+	go node1.Run()
+
+	sourceAddress, _ := node1.GetSocketAddress()
+	createCommand := utils.CreateRingCommand()
+	fmt.Println(createCommand.String())
+	reply := utils.SendMessage(createCommand.String(), sourceAddress)
+	jsonParsed, _ := gabs.ParseJSON([]byte(reply))
+	status, _ := strconv.Unquote(jsonParsed.Path("status").String())
+	fmt.Println("InRing - expected: true actual:", node1.InRing)
+	if (strings.Compare(status, "ok") != 0) {
+		t.Errorf("status = %s", status)
+	}
+}
+
+func TestJoinRing(t *testing.T) {
+	nodeDirectory := map[uint32]string{}
+	node1 := chordnode.GenerateRandomNode(&nodeDirectory)
+	node2 := chordnode.GenerateRandomNode(&nodeDirectory)
+	node1.AddNodeToDirectory()
+	node2.AddNodeToDirectory()
 
 	go node1.Run()
 	go node2.Run()
 
-	// Note: if we're using ID as address, should the JoinRing command still use string?
-	joinCommand := utils.JoinRingCommand(strconv.FormatUint(uint64(node1.ID), 10))
+	sourceAddress, _ := node1.GetSocketAddress()
+	joinCommand := utils.JoinRingCommand(sourceAddress)
 	fmt.Println(joinCommand.String())
-	qAddress := chordNode.GetAddress(nodeDirectory, strconv.FormatUint(uint64(node2.ID), 10) )
-	reply := utils.SendMessage(joinCommand.String(), qAddress)
+	destAddress, _ := node2.GetSocketAddress()
+	reply := utils.SendMessage(joinCommand.String(), destAddress)
+	jsonParsed, _ := gabs.ParseJSON([]byte(reply))
+	status, _ := strconv.Unquote(jsonParsed.Path("status").String())
+	fmt.Println("InRing - expected: true actual:", node2.InRing)
+	if (strings.Compare(status, "ok") != 0) {
+		t.Errorf("status = %s", status)
+	}
+}
 
-	fmt.Println(reply)
+func TestLeaveRing(t *testing.T) {
+	nodeDirectory := map[uint32]string{}
+	node1 := chordnode.GenerateRandomNode(&nodeDirectory)
+	node2 := chordnode.GenerateRandomNode(&nodeDirectory)
+	node1.AddNodeToDirectory()
+	node2.AddNodeToDirectory()
+
+	go node1.Run()
+	go node2.Run()
+
+	sourceAddress, _ := node1.GetSocketAddress()
+	joinCommand := utils.JoinRingCommand(sourceAddress)
+	fmt.Println(joinCommand.String())
+	destAddress, _ := node2.GetSocketAddress()
+	utils.SendMessage(joinCommand.String(), destAddress)
+
+	leaveCommandI := utils.LeaveRingCommand("immediately")
+	leaveCommandO := utils.LeaveRingCommand("orderly")
+	reply := utils.SendMessage(leaveCommandI.String(), destAddress)
+	jsonParsed, _ := gabs.ParseJSON([]byte(reply))
+	status, _ := strconv.Unquote(jsonParsed.Path("status").String())
+	fmt.Println("InRing - expected: false actual:", node2.InRing)
+	if (strings.Compare(status, "ok") != 0) {
+		t.Errorf("status = %s", status)
+	}
+
+	reply = utils.SendMessage(leaveCommandO.String(), sourceAddress)
+	jsonParsed, _ = gabs.ParseJSON([]byte(reply))
+	status, _ = strconv.Unquote(jsonParsed.Path("status").String())
+	fmt.Println("InRing - expected: false actual:", node1.InRing)
+	if (strings.Compare(status, "ok") != 0) {
+		t.Errorf("status = %s", status)
+	}
 }
