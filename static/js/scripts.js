@@ -1,13 +1,34 @@
+var nodes = [];
+
 $(document).ready(function() {
 	$("#add-node-button").click(function(e) {
-		$.ajax("http://localhost:8080/nodes", {"method":"POST"})
+		var numToAdd = $("#add-node-input").val()
+		for (var i = 0; i < numToAdd; i++) {
+			setTimeout(function() {
+				$.ajax("http://localhost:8080/nodes", {"method":"POST"});
+			}, 550);	
+		}
+	});
+	$("#join-node-button").click(function(e) {
+
+		var keys = Object.keys(nodes)
+		var joins = [];
+		for (var i = 0; i < keys.length; i++) {
+			if (!nodes[keys[i]].InRing) {
+				joins.push(nodes[keys[i]].ID);
+			}
+		}
+		var idx = Math.floor(Math.random()) * joins.length;
+
+		$.ajax("http://localhost:8080/nodes/" + joins[idx] + "/join", {"method":"POST"}).done(function(data) {console.log(data) });
 	});
 
 	setInterval(function() {
 		$.get("http://localhost:8080/nodes", function(data) {
-			var nodes = JSON.parse(data);
+			nodes = JSON.parse(data);
 			drawNodesTable(nodes);
 			drawNodesChart(nodes);
+
 			$(".join-link").click(function(e) {
 				e.preventDefault();
 				$.post($(this)[0].href);
@@ -19,6 +40,7 @@ $(document).ready(function() {
 		})
 	}, 1000);
 });
+
 
 function drawNodesChart(nodes) {
 	var c = document.getElementById("chart-canvas");
