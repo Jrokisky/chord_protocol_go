@@ -34,65 +34,65 @@ func PutCommand(key string, value string, replyTo string) string {
 
 }
 
-func GetCommand(key string, replyTo string) *gabs.Container {
+func GetCommand(key string, replyTo string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("get", "do")
 	jsonObj.Set(key, "data", "key")
 	jsonObj.Set(replyTo, "reply-to")
-	return jsonObj
+	return jsonObj.String()
 }
-func InitRingFingersCommand() *gabs.Container {
+func InitRingFingersCommand() string {
 	jsonObj := gabs.New()
 	jsonObj.Set("init-ring-fingers", "do")
-	return jsonObj
+	return jsonObj.String()
 }
-func StabilizeRingCommand() *gabs.Container {
+func StabilizeRingCommand() string {
 	jsonObj := gabs.New()
 	jsonObj.Set("stabilize-ring", "do")
-	return jsonObj
+	return jsonObj.String()
 }
-func FixRingFingersCommand() *gabs.Container {
+func FixRingFingersCommand() string {
 	jsonObj := gabs.New()
 	jsonObj.Set("fix-ring-fingers", "do")
-	return jsonObj
+	return jsonObj.String()
 }
-func getRingFingersCommand(replyTo string) *gabs.Container {
+func getRingFingersCommand(replyTo string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("get-ring-fingers", "do")
 	jsonObj.Set(replyTo, "reply-to")
-	return jsonObj
+	return jsonObj.String()
 }
-func RingNotifyCommand(replyTo string) *gabs.Container {
+func RingNotifyCommand(replyTo string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("ring-notify", "do")
 	jsonObj.Set(replyTo, "reply-to")
-	return jsonObj
+	return jsonObj.String()
 }
 
 // {"do": "find-ring-successor", "id": id, "reply-to": address}
-func FindRingSuccessorCommand(id uint32, replyTo string) *gabs.Container {
+func FindRingSuccessorCommand(id uint32, replyTo string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("find-ring-successor", "do")
 	jsonObj.Set(id, "id")
 	jsonObj.Set(replyTo, "reply-to")
-	return jsonObj
+	return jsonObj.String()
 }
-func FindRingPredecessorCommand(id uint32, replyTo string) *gabs.Container {
+func FindRingPredecessorCommand(id uint32, replyTo string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("find-ring-predecessor", "do")
 	jsonObj.Set(replyTo, "reply-to")
-	return jsonObj
+	return jsonObj.String()
 }
-func RemoveCommand(key string, replyTo string) *gabs.Container {
+func RemoveCommand(key string, replyTo string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("remove", "do")
 	jsonObj.Set(key, "data", "key")
 	jsonObj.Set(replyTo, "reply-to")
-	return jsonObj
+	return jsonObj.String()
 }
-func ListItemsCommand(replyTo string) *gabs.Container {
+func ListItemsCommand(replyTo string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("list-items", "do")
 	jsonObj.Set(replyTo, "reply-to")
-	return jsonObj
+	return jsonObj.String()
 }

@@ -5,11 +5,11 @@ import (
 	"chord/utils"
 
 	"encoding/json"
-	"fmt"
-	"net/http"
 	"errors"
-	"strconv"
+	"fmt"
 	"io/ioutil"
+	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	zmq "github.com/pebbe/zmq4"
@@ -70,6 +70,7 @@ func VizHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, string(f))
 	}
 }
+
 // WIP
 func VizJSHandler(w http.ResponseWriter, r *http.Request) {
 	f, err := ioutil.ReadFile("chord/static/scripts.js")
