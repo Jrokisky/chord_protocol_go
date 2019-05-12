@@ -93,9 +93,9 @@ func NodeJoinHandler(w http.ResponseWriter, r *http.Request) {
 
 	// First Node.
 	if err != nil {
-		cmd = utils.CreateRingCommand().String()
+		cmd = utils.CreateRingCommand()
 	} else {
-		cmd = utils.JoinRingCommand(sponsorNodeAddr).String()
+		cmd = utils.JoinRingCommand(sponsorNodeAddr)
 	}
 	response := SendCommand(address, cmd)
 
