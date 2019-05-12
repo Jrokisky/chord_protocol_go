@@ -3,9 +3,8 @@ package chordnode
 import (
 	"chord/utils"
 	"strconv"
-
 	"fmt"
-
+	"strings"
 	"github.com/Jeffail/gabs"
 	zmq "github.com/pebbe/zmq4"
 )
@@ -74,18 +73,65 @@ func (n ChordNode) Print() {
 	fmt.Printf("%+v\n", n)
 }
 
-func (n ChordNode) CreateRing() {
+func (n ChordNode) CreateRing(msg *gabs.Container) string {
+	n.InRing = true
+	jsonObj := gabs.New()
+	jsonObj.Set("ok", "status")
+	msg.Merge(jsonObj)
 
+	return msg.String()
 }
 
 // Respond to an instruction to join a chord ring
-func (n ChordNode) JoinRing(sponsoringNode string) string {
-	return ("Joined the ring!") // TODO CHANGE THIS
+func (n ChordNode) JoinRing(msg *gabs.Container) string {
+	n.InRing = true
+	jsonObj := gabs.New()
+	jsonObj.Set("ok", "status")
+	msg.Merge(jsonObj)
+
+	return msg.String()
 }
 
-func (n ChordNode) LeaveRing(mode string) string {
-	return ("Left the ring!") // TODO CHANGE THIS
+func (n ChordNode) LeaveRing(msg *gabs.Container) string {
+	mode := msg.Path("mode").String()
 
+	// Leave gracefully and inform others
+	if (strings.Compare(mode, "orderly") == 0) {
+		// notify predecessor and successor
+		// transfer keys to its successor
+		successorAddress, present := (*n.Directory)[*n.Successor]
+		myAddress, _ := n.GetSocketAddress()
+		if (!present) {
+			// TODO:
+			// Look in finger table // find closest alive successor
+			fmt.Println("Finger table entry, find closest alive successor")
+		} else {
+			// This is iterative and painful - can we send it all at once?
+			for k, v := range n.Data {
+				putCommand := utils.PutCommand(k, v, myAddress)
+				// TODO: Verify reply below?
+				reply := utils.SendMessage(putCommand.String(), successorAddress)
+				fmt.Println("k:%s v:%s reply:%s", k, v, reply)
+			}
+		}
+
+		// TODO: How do we communicate node updates like this? stabilization handles this?
+		// predecessor removes n from successor list
+		// add last node in n's successor list to predecessor's list
+		// successor will replace predecessor with n's predecessor
+
+	}
+
+	// Case for immediate: Just leave the party
+	// remove ourselves from the directory?
+	delete(*n.Directory, n.ID)
+	n.InRing = false
+
+	jsonObj := gabs.New()
+	jsonObj.Set("ok", "status")
+	msg.Merge(jsonObj)
+
+	return msg.String()
 }
 
 func (n ChordNode) InitRingFingers() string {
@@ -116,9 +162,9 @@ func (n ChordNode) FindRingSuccessor(id uint32) uint32 {
 	var result uint32
 	// Check if this key should belong to this node
 	if n.Predecessor != nil && id > *n.Predecessor && id < n.ID {
-		result = n.ID // Return this node's ID, since it's the successor of the given ID
+		//result = n.ID // Return this node's ID, since it's the successor of the given ID
 	} else if id > n.ID && id < *n.Successor {
-		result = *n.Successor
+		//result = *n.Successor
 	} else {
 		// TODO is there a case where successor is self?
 		// Make zmq call to successor
@@ -134,8 +180,10 @@ func (n ChordNode) FindRingPredecessor(id uint32) {
 
 }
 
-func (n ChordNode) Put(key string, value string) {
-
+func (n ChordNode) Put(msg *gabs.Container) string {
+	key := msg.Path("data").Path("key").String()
+	value := msg.Path("data").Path("value").String()
+	//replyTo := msg.Path("reply-to").String()
 	id := utils.ComputeId(key)
 	targetNode := n.FindRingSuccessor(id)
 	// Should we store it on this node?
@@ -262,12 +310,16 @@ func (n ChordNode) Run() {
 
 }
 
-func AddNodeToDirectory(directory map[uint32]string, node ChordNode) {
-	directory[node.ID] = fmt.Sprintf("tcp://%s:%d", node.Address, node.Port)
+func (n ChordNode) AddNodeToDirectory() {
+	(*n.Directory)[n.ID] = fmt.Sprintf("tcp://%s:%d", n.Address, n.Port)
 }
 
 func GetAddress(directory map[uint32]string, id string) string {
 	uid, _ := strconv.ParseUint(id, 10, 32)
 	uid32 := uint32(uid)
 	return directory[uid32]
+}
+func (n ChordNode) GetSocketAddress() (string, bool) {
+	address, present := (*n.Directory)[n.ID]
+	return address, present
 }
