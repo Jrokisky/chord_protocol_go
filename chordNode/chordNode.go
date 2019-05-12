@@ -5,7 +5,7 @@ import (
 	"strconv"
 
 	"fmt"
-	"strconv"
+
 	"github.com/Jeffail/gabs"
 	zmq "github.com/pebbe/zmq4"
 )
@@ -74,45 +74,45 @@ func (n ChordNode) Print() {
 	fmt.Printf("%+v\n", n)
 }
 
-func (n ChordNode) CreateRing(msg *gabs.Container) {
+func (n ChordNode) CreateRing() {
 
 }
 
 // Respond to an instruction to join a chord ring
-func (n ChordNode) JoinRing(msg *gabs.Container) {
+func (n ChordNode) JoinRing(sponsoringNode string) string {
+	return ("Joined the ring!") // TODO CHANGE THIS
+}
+
+func (n ChordNode) LeaveRing(mode string) string {
+	return ("Left the ring!") // TODO CHANGE THIS
 
 }
 
-func (n ChordNode) LeaveRing(msg *gabs.Container) {
-
+func (n ChordNode) InitRingFingers() string {
+	return ""
 }
 
-func (n ChordNode) InitRingFingers(msg *gabs.Container) {
-
+func (n ChordNode) FixRingFingers() string {
+	return ""
 }
 
-func (n ChordNode) FixRingFingers(msg *gabs.Container) {
-
+func (n ChordNode) StabilizeRing() string {
+	return ""
 }
 
-func (n ChordNode) StabilizeRing(msg *gabs.Container) {
-
+func (n ChordNode) RingNotify() string {
+	return ""
 }
 
-func (n ChordNode) RingNotify(msg *gabs.Container) {
-
-}
-
-func (n ChordNode) GetRingFingers(msg *gabs.Container) {
-
+func (n ChordNode) GetRingFingers() string {
+	return ""
 }
 
 // {"do": "find-ring-successor", "id": id, "reply-to": address}
-func (n ChordNode) FindRingSuccessor(msg *gabs.Container) *gabs.Container {
-	var id uint32
-	id64, err := strconv.ParseUint(msg.Path("id").String(), 10, 32)
-	id = uint32(id64) // TODO: This is stupid
-	replyTo := msg.Path("reply-to").String()
+// Will return the id of this node's successor in the ring
+func (n ChordNode) FindRingSuccessor(id uint32) uint32 {
+	// var id uint32
+	// replyTo := msg.Path("reply-to").String()
 	var result uint32
 	// Check if this key should belong to this node
 	if n.Predecessor != nil && id > *n.Predecessor && id < n.ID {
@@ -122,75 +122,124 @@ func (n ChordNode) FindRingSuccessor(msg *gabs.Container) *gabs.Container {
 	} else {
 		// TODO is there a case where successor is self?
 		// Make zmq call to successor
-		request := utils.FindRingPredecessorCommand(id, n.Address).String()
-		directory := *n.Directory
-		successor := *n.Successor
-		reply := utils.SendMessage(request, directory[successor]) // TODO This is BS why can't I nest them
-		result = jsonParsed.Path("id").String()
+		request := utils.FindRingPredecessorCommand(id, n.Address) // ask for id with self as reply-to
+		reply := utils.SendMessage(request, (*n.Directory)[*n.Successor])
+		jsonParsed, _ := gabs.ParseJSON([]byte(reply))
+		result = utils.ParseToUInt32(jsonParsed.Path("id").String())
 	}
-	jsonParsed, _ := gabs.ParseJSON([]byte(reply))
-	jsonObj := gabs.New()
-	jsonObj.Set(id, "id")
-	return jsonobj
+	return result
 }
 
-func (n ChordNode) FindRingPredecessor(msg *gabs.Container) {
+func (n ChordNode) FindRingPredecessor(id uint32) {
 
 }
 
-func (n ChordNode) Put(msg *gabs.Container) {
-	key := msg.Path("data").Path("key").String()
-	value := msg.Path("data").Path("value").String()
-	replyTo := msg.Path("reply-to").String()
+func (n ChordNode) Put(key string, value string) {
+
 	id := utils.ComputeId(key)
-	fmt.Printf("Storing key '%s' with value '%s' at hash %d", key, value, id)
-	return key
-}
-
-func (n ChordNode) Get(msg *gabs.Container) {
-
-}
-
-func (n ChordNode) Remove(msg *gabs.Container) {
-
-}
-
-func (n ChordNode) ListItems(msg *gabs.Container) {
-
-}
-
-func (n ChordNode) ProcessIncomingCommand(command string, msg *gabs.Container) string {
-	switch command {
-	case "create-ring":
-		n.CreateRing(msg)
-	case "join-ring":
-		n.JoinRing(msg)
-	case "init-ring-fingers":
-		n.InitRingFingers(msg)
-	case "fix-ring-fingers":
-		n.FixRingFingers(msg)
-	case "stabilize-ring":
-		n.StabilizeRing(msg)
-	case "leave-ring":
-		n.LeaveRing(msg)
-	case "ring-notify":
-		n.RingNotify(msg)
-	case "get-ring-fingers":
-		n.GetRingFingers(msg)
-	case "find-ring-successor":
-		n.FindRingSuccessor(msg)
-	case "find-ring-predecessor":
-		n.FindRingPredecessor(msg)
-	case "put":
-		n.Put(msg)
-	case "get":
-		n.Get(msg)
-	case "remove":
-		n.Remove(msg)
-	case "list-items":
-		n.ListItems(msg)
+	targetNode := n.FindRingSuccessor(id)
+	// Should we store it on this node?
+	if targetNode == n.ID {
+		n.Data[key] = value
+		fmt.Printf("Storing key '%s' with value '%s' at hash %d on this node, %d", key, value, id, n.ID)
+	} else {
+		fmt.Printf("Sending key '%s' with value '%s' to be stored on %d at hash %d", key, value, targetNode, id)
+		request := utils.PutCommand(key, value, n.Address)
+		reply := utils.SendMessage(request, (*n.Directory)[targetNode])
+		print(reply)
 	}
-	return "foo"
+}
+
+func (n ChordNode) Get(key string) string {
+	return ""
+}
+
+func (n ChordNode) Remove(key string) string {
+	return ""
+
+}
+
+func (n ChordNode) ListItems() string {
+	return ""
+
+}
+
+func (n ChordNode) ProcessIncomingCommand(msg string) string {
+
+	jsonParsed, _ := gabs.ParseJSON([]byte(msg))
+	fmt.Println(jsonParsed.StringIndent("", "  "))
+	command := jsonParsed.Path("do").String()
+
+	if command == "create-ring" {
+		n.CreateRing() // TODO: Update args
+		return ""
+	} else if command == "join-ring" {
+		sponsoringNode := jsonParsed.Path("sponsoring-node").String()
+		result := n.JoinRing(sponsoringNode)
+		return result // TODO what should this be?
+	} else if command == "init-ring-fingers" {
+		n.InitRingFingers()
+		return ""
+	} else if command == "fix-ring-fingers" {
+		n.FixRingFingers()
+		return ""
+	} else if command == "stabilize-ring" {
+		n.StabilizeRing()
+		return ""
+	} else if command == "leave-ring" {
+		mode := jsonParsed.Path("mode").String()
+		n.LeaveRing(mode)
+		return ""
+	} else if command == "ring-notify" {
+		n.RingNotify()
+		return ""
+	} else if command == "get-ring-fingers" {
+		n.GetRingFingers()
+		return ""
+	} else if command == "find-ring-successor" {
+		id := utils.ParseToUInt32(jsonParsed.Path("id").String())
+		n.FindRingSuccessor(id)
+		return ""
+	} else if command == "find-ring-predecessor" {
+		id := utils.ParseToUInt32(jsonParsed.Path("id").String())
+		n.FindRingPredecessor(id)
+		return ""
+	} else if command == "put" {
+		key := jsonParsed.Path("data").Path("key").String()
+		value := jsonParsed.Path("data").Path("value").String()
+		var result string
+		n.Put(key, value)
+		replyTo := jsonParsed.Path("reply-to").String()
+		jsonObj := gabs.New()
+		jsonObj.Set(result, "result")
+		utils.SendMessage(jsonObj.String(), replyTo)
+		return result
+	} else if command == "get" {
+		key := jsonParsed.Path("data").Path("key").String()
+		result := n.Get(key)
+		replyTo := jsonParsed.Path("reply-to").String()
+		jsonObj := gabs.New()
+		jsonObj.Set(result, "result")
+		utils.SendMessage(jsonObj.String(), replyTo)
+		return result
+	} else if command == "remove" {
+		key := jsonParsed.Path("data").Path("key").String()
+		result := n.Remove(key)
+		replyTo := jsonParsed.Path("reply-to").String()
+		jsonObj := gabs.New()
+		jsonObj.Set(result, "result")
+		utils.SendMessage(jsonObj.String(), replyTo)
+		return result
+	} else if command == "list-items" {
+		result := n.ListItems()
+		replyTo := jsonParsed.Path("reply-to").String()
+		jsonObj := gabs.New()
+		jsonObj.Set(result, "result")
+		utils.SendMessage(jsonObj.String(), replyTo)
+		return result
+	} else {
+		return "Invalid command received"
+	}
 }
 
 func (n ChordNode) Run() {
@@ -207,10 +256,7 @@ func (n ChordNode) Run() {
 	for true {
 		msg, _ := socket.Recv(0)
 
-		jsonParsed, _ := gabs.ParseJSON([]byte(msg))
-		fmt.Println(jsonParsed.StringIndent("", "  "))
-		command := jsonParsed.Path("do").String()
-		reply := n.ProcessIncomingCommand(command, jsonParsed)
+		reply := n.ProcessIncomingCommand(msg)
 		socket.Send(reply, 0)
 	}
 

@@ -5,6 +5,7 @@ import (
 	"encoding/binary"
 	"math/big"
 	"math/rand"
+	"strconv"
 
 	// TODO: remove - debugging
 	"fmt"
@@ -55,4 +56,10 @@ func SendMessage(msg string, address string) string {
 
 func GetRandomPort() int {
 	return rand.Intn(MaxPort-MinPort) + MinPort
+}
+
+func ParseToUInt32(input string) uint32 {
+	result64, _ := strconv.ParseUint(input, 10, 32) // TODO add error checking
+	result := uint32(result64)
+	return result
 }

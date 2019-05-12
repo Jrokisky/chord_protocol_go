@@ -5,11 +5,11 @@ import (
 	"chord/utils"
 
 	"encoding/json"
-	"fmt"
-	"net/http"
 	"errors"
-	"strconv"
+	"fmt"
 	"io/ioutil"
+	"net/http"
+	"strconv"
 
 	"github.com/gorilla/mux"
 	zmq "github.com/pebbe/zmq4"
@@ -25,14 +25,14 @@ var nodeIds []uint32
 func getSponsoringNodeAddress() (string, error) {
 	for _, id := range nodeIds {
 		if nodes[id].InRing {
-			return nodeDirectory[nodes[id].ID], nil
+			return NodeDirectory[nodes[id].ID], nil
 		}
 	}
 	return "", errors.New("No nodes in Ring")
 }
 
 func main() {
-	nodeDirectory = map[uint32]string{}
+	NodeDirectory = map[uint32]string{}
 	nodes = map[uint32]cn.ChordNode{}
 	router := mux.NewRouter()
 	router.HandleFunc("/visualize", VizHandler).Methods("GET")
@@ -50,7 +50,7 @@ func NodeHandler(w http.ResponseWriter, r *http.Request) {
 	} else if r.Method == "POST" {
 		node := cn.GenerateRandomNode(&NodeDirectory)
 		// Add node contact information to directory.
-		nodeDirectory[node.ID] = fmt.Sprintf("tcp://%s:%d", node.Address, node.Port)
+		NodeDirectory[node.ID] = fmt.Sprintf("tcp://%s:%d", node.Address, node.Port)
 		// Add node to global map of nodes.
 		nodes[node.ID] = node
 		nodeIds = append(nodeIds, node.ID)
@@ -70,6 +70,7 @@ func VizHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, string(f))
 	}
 }
+
 // WIP
 func VizJSHandler(w http.ResponseWriter, r *http.Request) {
 	f, err := ioutil.ReadFile("chord/static/scripts.js")
@@ -87,15 +88,15 @@ func NodeJoinHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		// todo error handling
 	}
-	address := nodeDirectory[uint32(id)]
+	address := NodeDirectory[uint32(id)]
 	var cmd string
 	sponsorNodeAddr, err := getSponsoringNodeAddress()
 
 	// First Node.
 	if err != nil {
-		cmd = utils.CreateRingCommand().String()
+		cmd = utils.CreateRingCommand()
 	} else {
-		cmd = utils.JoinRingCommand(sponsorNodeAddr).String()
+		cmd = utils.JoinRingCommand(sponsorNodeAddr)
 	}
 	response := SendCommand(address, cmd)
 
@@ -106,7 +107,7 @@ func NodeJoinHandler(w http.ResponseWriter, r *http.Request) {
 
 func NodeDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
-		json.NewEncoder(w).Encode(nodeDirectory)
+		json.NewEncoder(w).Encode(NodeDirectory)
 	}
 }
 
