@@ -44,7 +44,6 @@ func New(address string, port int, directory *map[uint32]string) *ChordNode {
 		ID:      id,
 		Address: address,
 		Port:    port}
-	n.Predecessor = new(uint32)
 	n.Successor = new(uint32)
 	n.Table = fingerTable{Size: 32}
 	n.Data = make(map[string]string)
