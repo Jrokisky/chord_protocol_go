@@ -3,9 +3,8 @@ package chordnode
 import (
 	"chord/utils"
 	"strconv"
-
 	"fmt"
-	"strconv"
+	"strings"
 	"github.com/Jeffail/gabs"
 	zmq "github.com/pebbe/zmq4"
 )
@@ -74,17 +73,65 @@ func (n ChordNode) Print() {
 	fmt.Printf("%+v\n", n)
 }
 
-func (n ChordNode) CreateRing(msg *gabs.Container) {
+func (n ChordNode) CreateRing(msg *gabs.Container) string {
+	n.InRing = true
+	jsonObj := gabs.New()
+	jsonObj.Set("ok", "status")
+	msg.Merge(jsonObj)
 
+	return msg.String()
 }
 
 // Respond to an instruction to join a chord ring
-func (n ChordNode) JoinRing(msg *gabs.Container) {
+func (n ChordNode) JoinRing(msg *gabs.Container) string {
+	n.InRing = true
+	jsonObj := gabs.New()
+	jsonObj.Set("ok", "status")
+	msg.Merge(jsonObj)
 
+	return msg.String()
 }
 
-func (n ChordNode) LeaveRing(msg *gabs.Container) {
+func (n ChordNode) LeaveRing(msg *gabs.Container) string {
+	mode := msg.Path("mode").String()
 
+	// Leave gracefully and inform others
+	if (strings.Compare(mode, "orderly") == 0) {
+		// notify predecessor and successor
+		// transfer keys to its successor
+		successorAddress, present := (*n.Directory)[*n.Successor]
+		myAddress, _ := n.GetSocketAddress()
+		if (!present) {
+			// TODO:
+			// Look in finger table // find closest alive successor
+			fmt.Println("Finger table entry, find closest alive successor")
+		} else {
+			// This is iterative and painful - can we send it all at once?
+			for k, v := range n.Data {
+				putCommand := utils.PutCommand(k, v, myAddress)
+				// TODO: Verify reply below?
+				reply := utils.SendMessage(putCommand.String(), successorAddress)
+				fmt.Println("k:%s v:%s reply:%s", k, v, reply)
+			}
+		}
+
+		// TODO: How do we communicate node updates like this? stabilization handles this?
+		// predecessor removes n from successor list
+		// add last node in n's successor list to predecessor's list
+		// successor will replace predecessor with n's predecessor
+
+	}
+
+	// Case for immediate: Just leave the party
+	// remove ourselves from the directory?
+	delete(*n.Directory, n.ID)
+	n.InRing = false
+
+	jsonObj := gabs.New()
+	jsonObj.Set("ok", "status")
+	msg.Merge(jsonObj)
+
+	return msg.String()
 }
 
 func (n ChordNode) InitRingFingers(msg *gabs.Container) {
@@ -110,38 +157,38 @@ func (n ChordNode) GetRingFingers(msg *gabs.Container) {
 // {"do": "find-ring-successor", "id": id, "reply-to": address}
 func (n ChordNode) FindRingSuccessor(msg *gabs.Container) *gabs.Container {
 	var id uint32
-	id64, err := strconv.ParseUint(msg.Path("id").String(), 10, 32)
+	id64, _ := strconv.ParseUint(msg.Path("id").String(), 10, 32)
 	id = uint32(id64) // TODO: This is stupid
-	replyTo := msg.Path("reply-to").String()
-	var result uint32
+	//replyTo := msg.Path("reply-to").String()
+	//var result uint32
 	// Check if this key should belong to this node
 	if n.Predecessor != nil && id > *n.Predecessor && id < n.ID {
-		result = n.ID // Return this node's ID, since it's the successor of the given ID
+		//result = n.ID // Return this node's ID, since it's the successor of the given ID
 	} else if id > n.ID && id < *n.Successor {
-		result = *n.Successor
+		//result = *n.Successor
 	} else {
 		// TODO is there a case where successor is self?
 		// Make zmq call to successor
-		request := utils.FindRingPredecessorCommand(id, n.Address).String()
-		directory := *n.Directory
-		successor := *n.Successor
-		reply := utils.SendMessage(request, directory[successor]) // TODO This is BS why can't I nest them
-		result = jsonParsed.Path("id").String()
+		//request := utils.FindRingPredecessorCommand(id, n.Address).String()
+		//directory := *n.Directory
+		//successor := *n.Successor
+		//reply := utils.SendMessage(request, directory[successor]) // TODO This is BS why can't I nest them
+		//result = jsonParsed.Path("id").String()
 	}
-	jsonParsed, _ := gabs.ParseJSON([]byte(reply))
+	//jsonParsed, _ := gabs.ParseJSON([]byte(reply))
 	jsonObj := gabs.New()
 	jsonObj.Set(id, "id")
-	return jsonobj
+	return jsonObj
 }
 
 func (n ChordNode) FindRingPredecessor(msg *gabs.Container) {
 
 }
 
-func (n ChordNode) Put(msg *gabs.Container) {
+func (n ChordNode) Put(msg *gabs.Container) string {
 	key := msg.Path("data").Path("key").String()
 	value := msg.Path("data").Path("value").String()
-	replyTo := msg.Path("reply-to").String()
+	//replyTo := msg.Path("reply-to").String()
 	id := utils.ComputeId(key)
 	fmt.Printf("Storing key '%s' with value '%s' at hash %d", key, value, id)
 	return key
@@ -160,11 +207,12 @@ func (n ChordNode) ListItems(msg *gabs.Container) {
 }
 
 func (n ChordNode) ProcessIncomingCommand(command string, msg *gabs.Container) string {
-	switch command {
+	cmd, _ := strconv.Unquote(command)
+	switch cmd {
 	case "create-ring":
-		n.CreateRing(msg)
+		return n.CreateRing(msg)
 	case "join-ring":
-		n.JoinRing(msg)
+		return n.JoinRing(msg)
 	case "init-ring-fingers":
 		n.InitRingFingers(msg)
 	case "fix-ring-fingers":
@@ -172,7 +220,7 @@ func (n ChordNode) ProcessIncomingCommand(command string, msg *gabs.Container) s
 	case "stabilize-ring":
 		n.StabilizeRing(msg)
 	case "leave-ring":
-		n.LeaveRing(msg)
+		return n.LeaveRing(msg)
 	case "ring-notify":
 		n.RingNotify(msg)
 	case "get-ring-fingers":
@@ -189,8 +237,11 @@ func (n ChordNode) ProcessIncomingCommand(command string, msg *gabs.Container) s
 		n.Remove(msg)
 	case "list-items":
 		n.ListItems(msg)
+	default:
+		return "default"
 	}
-	return "foo"
+
+	return "fail"
 }
 
 func (n ChordNode) Run() {
@@ -216,12 +267,11 @@ func (n ChordNode) Run() {
 
 }
 
-func AddNodeToDirectory(directory map[uint32]string, node ChordNode) {
-	directory[node.ID] = fmt.Sprintf("tcp://%s:%d", node.Address, node.Port)
+func (n ChordNode) AddNodeToDirectory() {
+	(*n.Directory)[n.ID] = fmt.Sprintf("tcp://%s:%d", n.Address, n.Port)
 }
 
-func GetAddress(directory map[uint32]string, id string) string {
-	uid, _ := strconv.ParseUint(id, 10, 32)
-	uid32 := uint32(uid)
-	return directory[uid32]
+func (n ChordNode) GetSocketAddress() (string, bool) {
+	address, present := (*n.Directory)[n.ID]
+	return address, present
 }
