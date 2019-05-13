@@ -19,20 +19,16 @@ $(document).ready(function() {
 		$.ajax("http://localhost:8080/nodes/" + joins[idx] + "/join", {"method":"POST"}).done(function(data) {console.log(data) });
 	});
 
+	$("body").on('click', '.action-link', function(e) {
+		e.preventDefault();
+		$.post($(this)[0].href);
+	});
+
 	setInterval(function() {
 		$.get("http://localhost:8080/nodes", function(data) {
 			nodes = JSON.parse(data);
 			drawNodesTable(nodes);
 			drawNodesChart(nodes);
-
-			$(".join-link").click(function(e) {
-				e.preventDefault();
-				$.post($(this)[0].href);
-			});
-			$(".leave-link").click(function(e) {
-				e.preventDefault();
-				$.post($(this)[0].href);
-			});
 		})
 	}, 1000);
 });
@@ -72,19 +68,22 @@ function drawNodesChart(nodes) {
 
 		var ctx = c.getContext("2d");
 		ctx.beginPath();
-		ctx.arc(center_x + x, center_y + y, 6, 0, 2 * Math.PI);
+		ctx.arc(center_x + x, center_y + y, 10, 0, 2 * Math.PI);
 		if (node.InRing) {
 			ctx.strokeStyle = 'green';	
+			ctx.fillStyle = 'green';
 		}
 		else {
 			ctx.strokeStyle = 'red';	
+			ctx.fillStyle = 'red';
 		}
+		ctx.fill();
 		ctx.stroke();
 
-		ctx.font = "9 px Comic Sans MS";
+		ctx.font = "25 px Comic Sans MS";
 		ctx.fillStyle = "black";
 		ctx.textAlign = "center";
-		ctx.fillText(i, center_x + x + 8, center_y + y + 8); 	
+		ctx.fillText(i, center_x + x, center_y + y); 	
 
 		// Draw connecting line.
 		if (node.Successor && node.Successor != 0) {
@@ -167,7 +166,7 @@ function drawNodesTable(nodes) {
 			join_link.appendChild(join_link_text);
 			join_link.title = "Join";
 			join_link.href = "http://localhost:8080/nodes/" + node.ID + "/join";
-			join_link.className = "join-link";
+			join_link.className = "action-link";
 
     			var join_link_td = document.createElement('td');
     			join_link_td.appendChild(join_link);
@@ -180,7 +179,7 @@ function drawNodesTable(nodes) {
 			leave_link_orderly.appendChild(leave_link_orderly_text);
 			leave_link_orderly.title = "Leave Orderly";
 			leave_link_orderly.href = "http://localhost:8080/nodes/" + node.ID + "/leave/orderly";
-			leave_link_orderly.className = "leave-link";
+			leave_link_orderly.className = "action-link";
 			leave_link_container.appendChild(leave_link_orderly)
 
 			var leave_link = document.createElement('a');
@@ -188,7 +187,7 @@ function drawNodesTable(nodes) {
 			leave_link.appendChild(leave_link_text);
 			leave_link.title = "Leave";
 			leave_link.href = "http://localhost:8080/nodes/" + node.ID + "/leave/rude";
-			leave_link.className = "leave-link";
+			leave_link.className = "action-link";
 			leave_link_container.appendChild(leave_link)
 
     			var leave_link_td = document.createElement('td');

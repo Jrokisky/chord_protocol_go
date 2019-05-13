@@ -17,6 +17,7 @@ import (
 
 const DEBUG = true
 const STABILIZE_TIME = 5000
+const CHK_PREDECESSOR_TIME = 7500
 
 // Map of Node ids to addresses
 var NodeDirectory map[uint32]string
@@ -39,6 +40,7 @@ func main() {
 	nodes = map[uint32]*cn.ChordNode{}
 	router := mux.NewRouter()
 	go Stabilizer()
+	go CheckPredecessorLoop()
 	router.HandleFunc("/visualize", VizHandler).Methods("GET")
 	fs := http.FileServer(http.Dir("./chord/static"))
 	router.PathPrefix("/js/").Handler(fs)
@@ -68,6 +70,17 @@ func Stabilizer() {
 	}
 }
 
+func CheckPredecessorLoop() {
+	for {
+
+		for i := 0; i < len(nodeIds); i++ {
+			address := NodeDirectory[nodeIds[i]]
+			cmd := utils.CheckPredecessorCommand()
+			_, _ = utils.SendMessage(cmd, address)
+			time.Sleep(CHK_PREDECESSOR_TIME * time.Millisecond)
+		}
+	}
+}
 // API ENDPOINTS
 func NodeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {

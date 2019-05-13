@@ -289,7 +289,7 @@ func (n *ChordNode) ProcessOrderlyLeave(jsonParsed *gabs.Container) string {
 	succ, succ_err := utils.ParseToUInt32(jsonParsed.Path("successor").String())
 	pred, pred_err := utils.ParseToUInt32(jsonParsed.Path("predecessor").String())
 
-	if (*(n.Successor) == leaver) && (succ_err == nil) {
+	if n.Successor != nil && (*(n.Successor) == leaver) && (succ_err == nil) {
 		// Replace n's successor (since it's leaving) with the leaving node's successor.
 		n.mux.Lock()
 		*(n.Successor) = succ
@@ -310,6 +310,17 @@ func (n *ChordNode) FindRingPredecessor() string {
 		return fmt.Sprint(*(n.Predecessor))
 	} else {
 		return "No Predecessor"
+	}
+}
+
+func (n *ChordNode) CheckPredecessor() {
+	if n.Predecessor != nil {
+		cmd := utils.PingCommand()
+		pred_address := (*n.Directory)[*(n.Predecessor)]
+		_, err := utils.SendMessage(cmd, pred_address)
+		if err != nil {
+			n.Predecessor = nil
+		}
 	}
 }
 
@@ -350,7 +361,7 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 
 	// If a node is not in the ring, simulate a dropped message.
 	switch strings.TrimSpace(command) {
-	case "init-ring-fingers", "stabilize-ring", "fix-ring-fingers", "leave-ring", "get-ring-fingers", "find-ring-successor", "find-ring-predecessor", "put", "get", "remove":
+	case "init-ring-fingers", "check-predecessor", "ring-notify", "notify-orderly-leave", "ping", "stabilize-ring", "fix-ring-fingers", "leave-ring", "get-ring-fingers", "find-ring-successor", "find-ring-predecessor", "put", "get", "remove":
 		if !n.InRing {
 			utils.Debug("[NOT_IN_RING] command: %s | %s is not in the ring.\n", command, fmt.Sprint(n.ID))
 			return "", errors.New("Not in Ring")
@@ -358,6 +369,8 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 	}
 
 	switch strings.TrimSpace(command) {
+	case "ping":
+		return "Healthy", nil
 	case "create-ring":
 		return n.CreateRing(jsonParsed), nil
 	case "join-ring":
@@ -386,6 +399,9 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 		return result, nil
 	case "get-ring-fingers":
 		n.GetRingFingers()
+		return "", nil
+	case "check-predecessor":
+		n.CheckPredecessor()
 		return "", nil
 	case "find-ring-successor":
 		id, _ := utils.ParseToUInt32(jsonParsed.Path("id").String())

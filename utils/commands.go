@@ -82,7 +82,16 @@ func RingNotifyCommand(id uint32, replyTo string) string {
 	jsonObj.Set(replyTo, "reply-to")
 	return jsonObj.String()
 }
-
+func PingCommand() string {
+	jsonObj := gabs.New()
+	jsonObj.Set("ping", "do")
+	return jsonObj.String()
+}
+func CheckPredecessorCommand() string {
+	jsonObj := gabs.New()
+	jsonObj.Set("check-predecessor", "do")
+	return jsonObj.String()
+}
 // {"do": "find-ring-successor", "id": id, "reply-to": address}
 func FindRingSuccessorCommand(id uint32, replyTo string) string {
 	jsonObj := gabs.New()
