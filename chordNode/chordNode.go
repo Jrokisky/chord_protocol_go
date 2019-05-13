@@ -189,12 +189,51 @@ func (n ChordNode) FixRingFingers() string {
 	return ""
 }
 
-func (n ChordNode) StabilizeRing() string {
-	return ""
+func (n *ChordNode) StabilizeRing() string {
+	if (n.Successor != nil) {
+		succ_addr := (*n.Directory)[*(n.Successor)]
+		cmd := utils.FindRingPredecessorCommand()
+		response, err := utils.SendMessage(cmd, succ_addr)
+		if err != nil {
+			return "Stabilization Failed due to lack of response from Successor"
+		} else {
+			successor := *(n.Successor)
+			if response != "No Predecessor" {
+				succ_pred, _ := utils.ParseToUInt32(response)
+				// Successor's Predecessor is in between this node and Successor
+				if utils.IsBetween(n.ID, *(n.Successor), succ_pred) {
+					n.mux.Lock()
+					successor = succ_pred
+					*(n.Successor) = successor
+					n.mux.Unlock()
+				}
+			}
+			// Send notify message to the new successor.
+			cmd := utils.RingNotifyCommand(n.ID, n.GetOwnAddress())
+			succ_addr := (*n.Directory)[successor]
+			_, err := utils.SendMessage(cmd, succ_addr)
+			if err != nil {
+				utils.Debug("[Stabilize %s] Error from successor %s\n", fmt.Sprint(n.ID), fmt.Sprint(successor))
+				return "Error Stabilizing Ring"
+			} else {
+				utils.Debug("[Stabilize %s] Error from successor %s\n", fmt.Sprint(n.ID), fmt.Sprint(successor))
+				return "Stabilization Successful!"
+			}
+		}
+	}
+	return "Could not stabilize. No Successor."
 }
 
-func (n ChordNode) RingNotify() string {
-	return ""
+func (n *ChordNode) RingNotify(id uint32, replyTo string) string {
+	if (n.Predecessor == nil) {
+		n.Predecessor = new(uint32)
+		*(n.Predecessor) = id
+		return fmt.Sprintf("Predecessor set to %d\n", id)
+	} else if (utils.IsBetween(*(n.Predecessor), n.ID, id)) {
+		*(n.Predecessor) = id
+		return fmt.Sprintf("Predecessor set to %d\n", id)
+	}
+	return "No Predecessor set\n"
 }
 
 func (n ChordNode) GetRingFingers() string {
@@ -266,8 +305,12 @@ func (n *ChordNode) ProcessOrderlyLeave(jsonParsed *gabs.Container) string {
 	return "No changes made"
 }
 
-func (n ChordNode) FindRingPredecessor(id uint32) {
-
+func (n *ChordNode) FindRingPredecessor() string {
+	if (n.Predecessor != nil) {
+		return fmt.Sprint(*(n.Predecessor))
+	} else {
+		return "No Predecessor"
+	}
 }
 
 func (n ChordNode) Put(key string, value string) (string, error) {
@@ -307,7 +350,7 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 
 	// If a node is not in the ring, simulate a dropped message.
 	switch strings.TrimSpace(command) {
-	case "init-ring-fingers", "fix-ring-fingers", "leave-ring", "get-ring-fingers", "find-ring-successor", "find-ring-predecessor", "put", "get", "remove":
+	case "init-ring-fingers", "stabilize-ring", "fix-ring-fingers", "leave-ring", "get-ring-fingers", "find-ring-successor", "find-ring-predecessor", "put", "get", "remove":
 		if !n.InRing {
 			utils.Debug("[NOT_IN_RING] command: %s | %s is not in the ring.\n", command, fmt.Sprint(n.ID))
 			return "", errors.New("Not in Ring")
@@ -328,7 +371,7 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 		return "", nil
 	case "stabilize-ring":
 		n.StabilizeRing()
-		return "", nil
+		return "Ring Stabilized", nil
 	case "leave-ring":
 		n.LeaveRing(jsonParsed)
 		return "", nil
@@ -336,8 +379,11 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 		result := n.ProcessOrderlyLeave(jsonParsed)
 		return result, nil
 	case "ring-notify":
-		n.RingNotify()
-		return "", nil
+		id, _ := utils.ParseToUInt32(jsonParsed.Path("id").String())
+		// TODO: i don't think reply to is needed here
+		replyTo := jsonParsed.Path("reply-to").Data().(string)
+		result := n.RingNotify(id, replyTo)
+		return result, nil
 	case "get-ring-fingers":
 		n.GetRingFingers()
 		return "", nil
@@ -352,9 +398,11 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 			return jsonObj.String(), nil
 		}
 	case "find-ring-predecessor":
-		id, _ := utils.ParseToUInt32(jsonParsed.Path("id").String())
-		n.FindRingPredecessor(id)
-		return "", nil
+		// TODO: I don't think this needs any arguments.
+		// AFAICT, a node will send this message to its successor to get the successor's
+		// predecessor.
+		result := n.FindRingPredecessor()
+		return result, nil
 	case "put":
 		key := jsonParsed.Path("data").Path("key").Data().(string)
 		value := jsonParsed.Path("data").Path("value").Data().(string)
@@ -417,6 +465,7 @@ func (n *ChordNode) Run() {
 		} else {
 			utils.Debug("[ChordRun: %s] Sending msg: %s\n", fmt.Sprint(n.ID), reply)
 			socket.Send(reply, 0)
+			utils.Debug("[ChordRun: %s] message sent\n", fmt.Sprint(n.ID))
 		}
 	}
 }

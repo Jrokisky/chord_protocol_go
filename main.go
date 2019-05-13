@@ -10,11 +10,13 @@ import (
 	"strconv"
 	"fmt"
 	"io/ioutil"
+	"time"
 
 	"github.com/gorilla/mux"
 )
 
 const DEBUG = true
+const STABILIZE_TIME = 5000
 
 // Map of Node ids to addresses
 var NodeDirectory map[uint32]string
@@ -36,15 +38,34 @@ func main() {
 	NodeDirectory = map[uint32]string{}
 	nodes = map[uint32]*cn.ChordNode{}
 	router := mux.NewRouter()
+	go Stabilizer()
 	router.HandleFunc("/visualize", VizHandler).Methods("GET")
 	fs := http.FileServer(http.Dir("./chord/static"))
 	router.PathPrefix("/js/").Handler(fs)
 	router.PathPrefix("/css/").Handler(fs)
 	router.HandleFunc("/nodes", NodeHandler).Methods("GET", "POST")
+	router.HandleFunc("/nodes/{count}", MultiNodeHandler).Methods("POST")
 	router.HandleFunc("/nodes/{id}/join", NodeJoinHandler).Methods("POST")
 	router.HandleFunc("/nodes/{id}/leave/{mode}", NodeLeaveHandler).Methods("POST")
 	router.HandleFunc("/nodeDirectory", NodeDirectoryHandler).Methods("GET")
 	http.ListenAndServe(":8080", router)
+}
+
+func Stabilizer() {
+	for {
+
+		for i := 0; i < len(nodeIds); i++ {
+			address := NodeDirectory[nodeIds[i]]
+			cmd := utils.StabilizeRingCommand()
+			response, err := utils.SendMessage(cmd, address)
+			if err != nil {
+				utils.Debug("[Stabilizer] unable to stabilize %s\n", fmt.Sprint(nodeIds[i]))
+			} else {
+				utils.Debug("[Stabilizer] response: %s\n", response)
+			}
+			time.Sleep(STABILIZE_TIME * time.Millisecond)
+		}
+	}
 }
 
 // API ENDPOINTS
@@ -62,6 +83,22 @@ func NodeHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(200)
 		json.NewEncoder(w).Encode(node.ID)
 	}
+}
+
+func MultiNodeHandler(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	count, _ := strconv.ParseUint(params["count"], 10, 32)
+	for j := 0; j < int(count); j++ {
+		node := cn.GenerateRandomNode(&NodeDirectory)
+		// Add node contact information to directory.
+		NodeDirectory[node.ID] = node.GetOwnAddress()
+		// Add node to global map of nodes.
+		nodes[node.ID] = node
+		nodeIds = append(nodeIds, node.ID)
+		go node.Run()
+	}
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode("Nodes added")
 }
 
 func VizHandler(w http.ResponseWriter, r *http.Request) {

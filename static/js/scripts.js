@@ -3,11 +3,7 @@ var nodes = [];
 $(document).ready(function() {
 	$("#add-node-button").click(function(e) {
 		var numToAdd = $("#add-node-input").val()
-		for (var i = 0; i < numToAdd; i++) {
-			setTimeout(function() {
-				$.ajax("http://localhost:8080/nodes", {"method":"POST"});
-			}, 550);	
-		}
+		$.ajax("http://localhost:8080/nodes/" + numToAdd, {"method":"POST"}).done(function(data) {console.log(data) });
 	});
 	$("#join-node-button").click(function(e) {
 
@@ -44,6 +40,10 @@ $(document).ready(function() {
 
 function drawNodesChart(nodes) {
 	var c = document.getElementById("chart-canvas");
+	var dpi = window.devicePixelRatio;
+
+	c.width = c.clientWidth;
+	c.height = c.clientHeight;
 
 	var width = c.width;
 	var height = c.height;
@@ -72,7 +72,7 @@ function drawNodesChart(nodes) {
 
 		var ctx = c.getContext("2d");
 		ctx.beginPath();
-		ctx.arc(center_x + x, center_y + y, 3, 0, 2 * Math.PI);
+		ctx.arc(center_x + x, center_y + y, 6, 0, 2 * Math.PI);
 		if (node.InRing) {
 			ctx.strokeStyle = 'green';	
 		}
@@ -81,7 +81,7 @@ function drawNodesChart(nodes) {
 		}
 		ctx.stroke();
 
-		ctx.font = "4 px Comic Sans MS";
+		ctx.font = "9 px Comic Sans MS";
 		ctx.fillStyle = "black";
 		ctx.textAlign = "center";
 		ctx.fillText(i, center_x + x + 8, center_y + y + 8); 	

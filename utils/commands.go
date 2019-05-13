@@ -75,9 +75,10 @@ func getRingFingersCommand(replyTo string) string {
 	jsonObj.Set(replyTo, "reply-to")
 	return jsonObj.String()
 }
-func RingNotifyCommand(replyTo string) string {
+func RingNotifyCommand(id uint32, replyTo string) string {
 	jsonObj := gabs.New()
 	jsonObj.Set("ring-notify", "do")
+	jsonObj.Set(id, "id")
 	jsonObj.Set(replyTo, "reply-to")
 	return jsonObj.String()
 }
@@ -90,10 +91,9 @@ func FindRingSuccessorCommand(id uint32, replyTo string) string {
 	jsonObj.Set(replyTo, "reply-to")
 	return jsonObj.String()
 }
-func FindRingPredecessorCommand(id uint32, replyTo string) string {
+func FindRingPredecessorCommand() string {
 	jsonObj := gabs.New()
 	jsonObj.Set("find-ring-predecessor", "do")
-	jsonObj.Set(replyTo, "reply-to")
 	return jsonObj.String()
 }
 func RemoveCommand(key string, replyTo string) string {
