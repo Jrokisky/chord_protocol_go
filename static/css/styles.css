@@ -9,6 +9,11 @@
 
 }
 
+#node-list {
+ 	height: 750px;
+	overflow: scroll;
+}
+
 #chart-container{
 	height: 100%;
 	width: 75%;
