@@ -41,22 +41,46 @@ func ComputeId(input string) uint32 {
 	return binary.BigEndian.Uint32(result_big.Bytes())
 }
 
+// From: https://github.com/pebbe/zmq4/blob/master/examples/asyncsrv.go
+func SetId(socket *zmq.Socket) {
+	identity := fmt.Sprintf("%04X-%04X", rand.Intn(0x10000), rand.Intn(0x10000))
+	socket.SetIdentity(identity)
+}
+
+// From: https://github.com/pebbe/zmq4/blob/master/examples/asyncsrv.go
+func Pop(msg []string) ([]string, []string, error) {
+	if len(msg) == 0 {
+		return msg, msg, errors.New("Empty array passed to pop]\n")
+	}
+	var head []string
+	var tail []string
+	if msg[1] == "" {
+		head = msg[:2]
+		tail = msg[2:]
+	} else {
+		head = msg[:1]
+		tail = msg[1:]
+	}
+	return head, tail, nil
+}
+
 func SendMessage(msg string, address string) (string, error) {
 	context, _ := zmq.NewContext()
 	defer context.Term()
 
-	socket, _ := context.NewSocket(zmq.REQ)
+	socket, _ := context.NewSocket(zmq.DEALER)
 	defer socket.Close()
 
 	Debug("[SendMessage] Sending msg: %s to address: %s\n", msg, address)
-	socket.Bind(address)
-	socket.Send(msg, 0)
+	SetId(socket)
+	socket.Connect(address)
+	socket.SendMessage(msg)
 
-	reply, err := socket.Recv(0)
-	if reply == ERROR_MSG || err != nil {
+	reply, err := socket.RecvMessage(0)
+	if reply[0] == ERROR_MSG || err != nil {
 		return "", errors.New("Dropped Message")
 	} else {
-		return string(reply), nil
+		return string(reply[0]), nil
 	}
 }
 

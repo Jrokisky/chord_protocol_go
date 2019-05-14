@@ -461,28 +461,51 @@ func (n *ChordNode) Run() {
 	context, _ := zmq.NewContext()
 	defer context.Term()
 
-	socket, _ := context.NewSocket(zmq.REP)
+	socket, _ := context.NewSocket(zmq.ROUTER)
 	defer socket.Close()
-	socket.Connect(fmt.Sprintf("tcp://%s:%d", n.Address, n.Port))
+	socket.Bind(fmt.Sprintf("tcp://%s:%d", n.Address, n.Port))
 
+	dealer, _ := zmq.NewSocket(zmq.DEALER)
+	defer dealer.Close()
+	dealer.Bind(fmt.Sprintf("inproc://%d", n.ID))
+
+	for i := 0; i < 8; i++ {
+		utils.Debug("[ChordRun: %s] worker threads spawned\n", fmt.Sprint(n.ID))
+		go n.ChordWorker()
+	}
 	utils.Debug("[ChordRun: %s] Client bound to port %s\n", fmt.Sprint(n.ID), fmt.Sprint(n.Port))
 
+	err := zmq.Proxy(socket, dealer, nil)
+	if err != nil {
+		utils.Debug("[ChordRun: %s] Proxy dropped\n", fmt.Sprint(n.ID))
+	}
+}
+
+func (n *ChordNode) ChordWorker() {
+	worker,  _ := zmq.NewSocket(zmq.DEALER)
+	defer worker.Close()
+	worker.Connect(fmt.Sprintf("inproc://%d", n.ID))
+
+	utils.Debug("[ChordRun: %s] Worker thread loop starting\n", fmt.Sprint(n.ID))
 	for {
-		msg, err := socket.Recv(0)
+		msg, err := worker.RecvMessage(0)
+		id, content, err := utils.Pop(msg)
+
 		if err != nil {
-			utils.Debug(err.Error())
+			utils.Debug("[chordRun: %s] worker errord\n", fmt.Sprint(n.ID))
+		} else {
+			utils.Debug("[chordRun: %s] worker received: %s\n", fmt.Sprint(n.ID), (string)(content[0]))
+			reply, err := n.ProcessIncomingCommand(content[0])
+			if err != nil {
+				utils.Debug("[ChordRun: %s] Sending Error msg: %s\n", fmt.Sprint(n.ID), err.Error())
+				worker.SendMessage(id, utils.ERROR_MSG)
+			} else {
+				utils.Debug("[ChordRun: %s] Sending msg: %s\n", fmt.Sprint(n.ID), reply)
+				worker.SendMessage(id, reply)
+				utils.Debug("[ChordRun: %s] message sent\n", fmt.Sprint(n.ID))
+			}
 		}
 
-		utils.Debug("[chordRun: %s] msg received: %s\n", fmt.Sprint(n.ID), (string)(msg))
-		reply, err := n.ProcessIncomingCommand(msg)
-		if err != nil {
-			utils.Debug("[ChordRun: %s] Sending Error msg: %s\n", fmt.Sprint(n.ID), err.Error())
-			socket.Send(utils.ERROR_MSG, 0)
-		} else {
-			utils.Debug("[ChordRun: %s] Sending msg: %s\n", fmt.Sprint(n.ID), reply)
-			socket.Send(reply, 0)
-			utils.Debug("[ChordRun: %s] message sent\n", fmt.Sprint(n.ID))
-		}
 	}
 }
 
