@@ -48,6 +48,7 @@ func main() {
 	router.HandleFunc("/nodes", NodeHandler).Methods("GET", "POST")
 	router.HandleFunc("/nodes/{count}", MultiNodeHandler).Methods("POST")
 	router.HandleFunc("/nodes/{id}/join", NodeJoinHandler).Methods("POST")
+	router.HandleFunc("/nodes/{id}/ping", NodePingHandler).Methods("POST")
 	router.HandleFunc("/nodes/{id}/leave/{mode}", NodeLeaveHandler).Methods("POST")
 	router.HandleFunc("/nodeDirectory", NodeDirectoryHandler).Methods("GET")
 	http.ListenAndServe(":8080", router)
@@ -148,6 +149,21 @@ func NodeJoinHandler(w http.ResponseWriter, r *http.Request) {
 
 }
 
+func NodePingHandler(w http.ResponseWriter, r *http.Request) {
+	params := mux.Vars(r)
+	id, err := strconv.ParseUint(params["id"], 10, 32)
+	if err != nil {
+		// todo error handling
+	}
+	address := NodeDirectory[uint32(id)]
+	var cmd string
+	cmd = utils.PingCommand()
+	response, _ := utils.SendMessage(cmd, address)
+
+	w.WriteHeader(200)
+	json.NewEncoder(w).Encode(response)
+
+}
 func NodeLeaveHandler(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
 	id, err := strconv.ParseUint(params["id"], 10, 32)
