@@ -5,19 +5,21 @@ import (
 	"chord/utils"
 
 	"encoding/json"
-	"errors"
 	"net/http"
 	"strconv"
 	"fmt"
 	"io/ioutil"
+	"math/rand"
 	"time"
+	"errors"
 
 	"github.com/gorilla/mux"
 )
 
 const DEBUG = true
-const STABILIZE_TIME = 2000
-const CHK_PREDECESSOR_TIME = 2500
+const STABILIZE_TIME = 750
+const CHK_PREDECESSOR_TIME = 1000
+const FIX_FINGER_TIME = 500
 
 // Map of Node ids to addresses
 var NodeDirectory map[uint32]string
@@ -27,12 +29,18 @@ var nodes map[uint32]*cn.ChordNode
 var nodeIds []uint32
 
 func getSponsoringNodeAddress() (string, error) {
+	nodes_in_ring := []uint32{}
 	for _, id := range nodeIds {
-		if nodes[id].InRing {
-			return NodeDirectory[nodes[id].ID], nil
+		if (*(nodes[id])).InRing {
+			nodes_in_ring = append(nodes_in_ring, id)
 		}
 	}
-	return "", errors.New("No nodes in Ring")
+	if len(nodes_in_ring) == 0 {
+		return "", errors.New("wot")
+	}
+	nid := nodes_in_ring[rand.Intn(len(nodes_in_ring))]
+
+	return NodeDirectory[nid], nil
 }
 
 func main() {
@@ -41,6 +49,7 @@ func main() {
 	router := mux.NewRouter()
 	go Stabilizer()
 	go CheckPredecessorLoop()
+	go FixFinger()
 	router.HandleFunc("/visualize", VizHandler).Methods("GET")
 	fs := http.FileServer(http.Dir("./chord/static"))
 	router.PathPrefix("/js/").Handler(fs)
@@ -52,6 +61,24 @@ func main() {
 	router.HandleFunc("/nodes/{id}/leave/{mode}", NodeLeaveHandler).Methods("POST")
 	router.HandleFunc("/nodeDirectory", NodeDirectoryHandler).Methods("GET")
 	http.ListenAndServe(":8080", router)
+}
+
+func FixFinger() {
+	for {
+
+		for i := 0; i < len(nodeIds); i++ {
+			address := NodeDirectory[nodeIds[i]]
+			cmd := utils.FixRingFingersCommand()
+			response, err := utils.SendMessage(cmd, address)
+			if err != nil {
+				utils.Debug("[Fix Ring Fingers] unable to stabilize %s\n", fmt.Sprint(nodeIds[i]))
+			} else {
+				utils.Debug("[Fix Ring Fingers] response: %s\n", response)
+			}
+			time.Sleep(FIX_FINGER_TIME * time.Millisecond)
+		}
+	}
+
 }
 
 func Stabilizer() {
@@ -140,6 +167,7 @@ func NodeJoinHandler(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		cmd = utils.CreateRingCommand()
 	} else {
+		utils.Debug("\t\t[SPONSORING_NODE_ADDR] %s\n", sponsorNodeAddr)
 		cmd = utils.JoinRingCommand(sponsorNodeAddr)
 	}
 	response, _ := utils.SendMessage(cmd, address)

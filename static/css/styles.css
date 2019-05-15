@@ -14,6 +14,11 @@
 	overflow: scroll;
 }
 
+.finger-div {
+	max-width: 75px;
+	overflow: wrap;
+}
+
 #chart-container{
 	height: 100%;
 	width: 75%;

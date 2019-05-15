@@ -27,6 +27,9 @@ type ChordNode struct {
 	Data		map[string]string
 	Directory	*map[uint32]string
 	mux		sync.Mutex
+	curr_finger	int
+	SecondNode	bool // This is a janky way for node that created the ring to take
+			     // special action when the second node joins.
 }
 
 /*
@@ -45,6 +48,8 @@ func New(address string, port int, directory *map[uint32]string) *ChordNode {
 	n.Data = make(map[string]string)
 	n.Directory = directory
 	n.InRing = false
+	n.curr_finger = 0
+	n.SecondNode = true
 	return &n
 }
 
@@ -80,7 +85,10 @@ func (n *ChordNode) CreateRing(msg *gabs.Container) string {
 	n.Predecessor = nil
 	n.Successor = new(uint32)
 	*(n.Successor) = n.ID
+	n.Table[0] = new(uint32)
+	*(n.Table[0]) = n.ID
 	n.InRing = true
+	n.SecondNode = false
 	n.mux.Unlock()
 
 	jsonObj := gabs.New()
@@ -108,9 +116,12 @@ func (n *ChordNode) JoinRing(msg *gabs.Container) string {
 			n.Successor = new(uint32)
 		}
 		*(n.Successor) = id
+		n.InRing = true
+		// Init Finger table
+		n.Table[0] = new(uint32)
+		*(n.Table[0]) = id
 		n.mux.Unlock()
 
-		n.InRing = true
 		jsonObj.Set("ok", "status")
 	}
 
@@ -161,10 +172,14 @@ func (n *ChordNode) LeaveRing(msg *gabs.Container) string {
 
 
 	}
-
+	n.mux.Lock()
 	n.InRing = false
 	n.Predecessor = nil
 	n.Successor = nil
+	for k := 0; k < 32; k++ {
+		n.Table[k] = nil
+	}
+	n.mux.Unlock()
 
 	jsonObj := gabs.New()
 	jsonObj.Set("ok", "status")
@@ -177,8 +192,32 @@ func (n ChordNode) InitRingFingers() string {
 	return ""
 }
 
-func (n ChordNode) FixRingFingers() string {
-	return ""
+func (n *ChordNode) FixRingFingers() string {
+	n.mux.Lock()
+	n.curr_finger = n.curr_finger + 1
+	if n.curr_finger > 31 {
+		n.curr_finger = 0
+	}
+	// Ask the closest preceding finger
+	finger_id := n.ID + (uint32)(2^(n.curr_finger)) // Rely on integer wraparound
+	request := utils.FindRingSuccessorCommand(finger_id, n.GetOwnAddress())
+	directory := *n.Directory
+	response_from_successor, err := utils.SendMessage(request, directory[*(n.Successor)])
+	if err != nil {
+		// TODO: we could possibly try again with another node in the finger table.
+		n.mux.Unlock()
+		return "Failure Fixing Finger"
+	} else {
+		jsonParsed, _ := gabs.ParseJSON([]byte(response_from_successor))
+		id, _ := utils.ParseToUInt32(jsonParsed.Path("id").String())
+		if n.Table[n.curr_finger] == nil {
+			n.Table[n.curr_finger] = new(uint32)
+		}
+		*(n.Table[n.curr_finger]) = id
+		n.mux.Unlock()
+		return fmt.Sprintf("Success Fixing Finger %d with value %d\n", finger_id, id)
+	}
+
 }
 
 func (n *ChordNode) StabilizeRing() string {
@@ -212,16 +251,24 @@ func (n *ChordNode) StabilizeRing() string {
 				return "Stabilization Successful!"
 			}
 		}
+	} else {
+		// Successor failed so update with some value from the finger table
+		for k := 0; k < 32; k++ {
+			if n.Table[k] != nil {
+				*(n.Successor) = *(n.Table[k])
+				break;
+			}
+		}
 	}
 	return "Could not stabilize. No Successor."
 }
 
 func (n *ChordNode) RingNotify(id uint32, replyTo string) string {
-	if (n.Predecessor == nil) {
+	if (n.Predecessor == nil && n.ID != id) {
 		n.Predecessor = new(uint32)
 		*(n.Predecessor) = id
 		return fmt.Sprintf("Predecessor set to %d\n", id)
-	} else if (utils.IsBetween(*(n.Predecessor), n.ID, id)) {
+	} else if n.Predecessor != nil && (utils.IsBetween(*(n.Predecessor), n.ID, id)) {
 		*(n.Predecessor) = id
 		return fmt.Sprintf("Predecessor set to %d\n", id)
 	}
@@ -232,21 +279,33 @@ func (n ChordNode) GetRingFingers() string {
 	return ""
 }
 
+func (n *ChordNode) ClosestPrecedingNode(id uint32) uint32 {
+	for i := 31; i >= 0; i-- {
+		if (n.Table[i]) != nil {
+			finger_val := *(n.Table[i])
+			if utils.IsBetween(n.ID, id, finger_val) {
+				return finger_val
+			}
+		}
+	}
+	return n.ID
+}
+
 // {"do": "find-ring-successor", "id": id, "reply-to": address}
 func (n *ChordNode) FindRingSuccessor(id uint32) (uint32, error) {
 	var result uint32
-	// Special case when adding second node to ring
-	if n.Predecessor == nil && *(n.Successor) == n.ID {
-		utils.Debug("\t[FindRingSuccessor] Adding second node to ring\n")
-		// First node in the Chord, so now there's only two nodes in chord.
+	// Special case for when the second node joins, so we can break the cycle of the 
+	// first node's successor being itself.
+	if !n.SecondNode { // Will be set to true for all nodes that didn't create the ring
 		n.mux.Lock()
 		n.Predecessor = new(uint32)
 		*(n.Predecessor) = id
 		n.Successor = new(uint32)
 		*(n.Successor) = id
+		n.SecondNode = true
 		n.mux.Unlock()
 		result = n.ID
-	} else if(utils.IsBetween(n.ID, *(n.Successor), id)) {
+	} else if utils.IsBetween(n.ID, *(n.Successor), id) {
 		utils.Debug("\t[FindRingSuccessor: %s] id: %s is between %s and its successor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(id), fmt.Sprint(n.ID), fmt.Sprint(*(n.Successor)))
 		result = *(n.Successor)
 	} else if (n.Predecessor != nil) && (utils.IsBetween(*(n.Predecessor), n.ID, id)) {
@@ -256,9 +315,14 @@ func (n *ChordNode) FindRingSuccessor(id uint32) (uint32, error) {
 		// Recursively ask successors.
 		utils.Debug("\t[FindRingSuccessor: %s] Passing message to successor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(*(n.Successor)))
 		request := utils.FindRingSuccessorCommand(id, n.GetOwnAddress())
+		target_successor := n.ClosestPrecedingNode(id)
+		// Hey that's us!
+		if target_successor == n.ID {
+			return n.ID, nil
+		}
+		utils.Debug("\t[FindRingSuccessor: %s] Passing message to successor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(*(n.Successor)))
 		directory := *n.Directory
-		successor := *(n.Successor)
-		response_from_successor, err := utils.SendMessage(request, directory[successor])
+		response_from_successor, err := utils.SendMessage(request, directory[target_successor])
 		if err != nil {
 			return 0, errors.New("Error finding Ring Successor")
 		} else {
@@ -366,8 +430,8 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 		n.InitRingFingers()
 		return "", nil
 	case "fix-ring-fingers":
-		n.FixRingFingers()
-		return "", nil
+		result := n.FixRingFingers()
+		return result, nil
 	case "stabilize-ring":
 		n.StabilizeRing()
 		return "Ring Stabilized", nil

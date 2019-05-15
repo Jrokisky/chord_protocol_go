@@ -67,6 +67,37 @@ function drawNodesChart(nodes) {
 		var x = Math.cos(radians) * radius;
 
 		var ctx = c.getContext("2d");
+		var adjust = 15;
+		
+
+		var table = node.Table;
+		for ( var j = 0; j < 32; j++) {
+			if (node.Table[j] !== null) {
+				var ratio = node.Table[j] / max_id;
+				var radians = (ratio * 2 * Math.PI) - (Math.PI/2);
+				var sy = Math.sin(radians) * (radius-adjust);
+				var sx = Math.cos(radians) * (radius-adjust);
+
+				ctx.strokeStyle = 'red';	
+				ctx.beginPath();
+				ctx.moveTo(center_x + x, center_y + y);
+				ctx.lineTo(center_x + sx, center_y + sy);
+				ctx.stroke();
+			}
+		}
+		// Draw connecting line.
+		if (node.Successor && node.Successor != 0) {
+			var ratio = node.Successor / max_id;
+			var radians = (ratio * 2 * Math.PI) - (Math.PI/2);
+			var sy = Math.sin(radians) * (radius-adjust);
+			var sx = Math.cos(radians) * (radius-adjust);
+
+			ctx.strokeStyle = 'blue';
+			ctx.beginPath();
+			ctx.moveTo(center_x + x, center_y + y);
+			ctx.lineTo(center_x + sx, center_y + sy);
+			ctx.stroke();
+		}
 		ctx.beginPath();
 		ctx.arc(center_x + x, center_y + y, 10, 0, 2 * Math.PI);
 		if (node.InRing) {
@@ -83,21 +114,7 @@ function drawNodesChart(nodes) {
 		ctx.font = "25 px Comic Sans MS";
 		ctx.fillStyle = "black";
 		ctx.textAlign = "center";
-		ctx.fillText(i, center_x + x, center_y + y); 	
-
-		// Draw connecting line.
-		if (node.Successor && node.Successor != 0) {
-			var ratio = node.Successor / max_id;
-			var radians = (ratio * 2 * Math.PI) - (Math.PI/2);
-			var sy = Math.sin(radians) * radius;
-			var sx = Math.cos(radians) * radius;
-
-			ctx.strokeStyle = 'blue';	
-			ctx.beginPath();
-			ctx.moveTo(center_x + x, center_y + y);
-			ctx.lineTo(center_x + sx, center_y + sy);
-			ctx.stroke();
-		}
+		ctx.fillText(i, center_x + x, center_y + y); 
 	}
 }
 
@@ -129,6 +146,11 @@ function drawNodesTable(nodes) {
 	pred_th.appendChild(pred);
     	tr.appendChild(pred_th);
 
+	var fin = document.createTextNode("FINGERS");
+    	var fin_th = document.createElement('th');
+	fin_th.appendChild(fin);
+    	tr.appendChild(fin_th);
+
 	var join_a = document.createTextNode("OPERATION");
     	var join_a_th = document.createElement('th');
 	join_a_th.appendChild(join_a);
@@ -159,6 +181,21 @@ function drawNodesTable(nodes) {
     		var pred_td = document.createElement('td');
     		pred_td.appendChild(pred);
     		tr.appendChild(pred_td);
+
+		var fingers = "";
+		var last_found = -1;
+    		var fin_td = document.createElement('td');
+		for (var k = 0; k < 32; k++) {
+			if (node.Table[k] !== null && node.Table[k] != last_found) {
+				var t_div = document.createElement('div');
+				t_div.className = "finger-div"
+				last_found = node.Table[k]
+    				var fin = document.createTextNode(node.Table[k]);
+				t_div.appendChild(fin);
+    				fin_td.appendChild(t_div);
+			}
+		}
+    		tr.appendChild(fin_td);
 
 		if (!node.InRing) {
     			var join_link = document.createElement('a');
