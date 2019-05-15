@@ -17,9 +17,9 @@ import (
 )
 
 const DEBUG = true
-const STABILIZE_TIME = 750
-const CHK_PREDECESSOR_TIME = 1000
-const FIX_FINGER_TIME = 500
+const STABILIZE_TIME = 1000
+const CHK_PREDECESSOR_TIME = 1500
+const FIX_FINGER_TIME = 1000
 
 // Map of Node ids to addresses
 var NodeDirectory map[uint32]string

@@ -85,8 +85,6 @@ func (n *ChordNode) CreateRing(msg *gabs.Container) string {
 	n.Predecessor = nil
 	n.Successor = new(uint32)
 	*(n.Successor) = n.ID
-	n.Table[0] = new(uint32)
-	*(n.Table[0]) = n.ID
 	n.InRing = true
 	n.SecondNode = false
 	n.mux.Unlock()
@@ -292,8 +290,9 @@ func (n *ChordNode) ClosestPrecedingNode(id uint32) uint32 {
 }
 
 // {"do": "find-ring-successor", "id": id, "reply-to": address}
-func (n *ChordNode) FindRingSuccessor(id uint32) (uint32, error) {
+func (n *ChordNode) FindRingSuccessor(id uint32) (uint32, bool, error) {
 	var result uint32
+	var more bool // Did we reach the end of the chain, or is there more to search?
 	// Special case for when the second node joins, so we can break the cycle of the 
 	// first node's successor being itself.
 	if !n.SecondNode { // Will be set to true for all nodes that didn't create the ring
@@ -302,36 +301,26 @@ func (n *ChordNode) FindRingSuccessor(id uint32) (uint32, error) {
 		*(n.Predecessor) = id
 		n.Successor = new(uint32)
 		*(n.Successor) = id
+		n.Table[0] = new(uint32)
+		*(n.Table[0]) = id
 		n.SecondNode = true
 		n.mux.Unlock()
 		result = n.ID
+		more = false
+	} else if id == n.ID {
+		result = *(n.Successor)
+		more = false
 	} else if utils.IsBetween(n.ID, *(n.Successor), id) {
 		utils.Debug("\t[FindRingSuccessor: %s] id: %s is between %s and its successor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(id), fmt.Sprint(n.ID), fmt.Sprint(*(n.Successor)))
 		result = *(n.Successor)
-	} else if (n.Predecessor != nil) && (utils.IsBetween(*(n.Predecessor), n.ID, id)) {
-		utils.Debug("\t[FindRingSuccessor: %s] id: %s is between %s's predecessorr: %s and itself\n", fmt.Sprint(n.ID), fmt.Sprint(id), fmt.Sprint(n.ID), fmt.Sprint(*(n.Predecessor)))
-		result = n.ID
+		more = false
 	} else {
-		// Recursively ask successors.
-		utils.Debug("\t[FindRingSuccessor: %s] Passing message to successor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(*(n.Successor)))
-		request := utils.FindRingSuccessorCommand(id, n.GetOwnAddress())
-		target_successor := n.ClosestPrecedingNode(id)
-		// Hey that's us!
-		if target_successor == n.ID {
-			return n.ID, nil
-		}
-		utils.Debug("\t[FindRingSuccessor: %s] Passing message to successor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(*(n.Successor)))
-		directory := *n.Directory
-		response_from_successor, err := utils.SendMessage(request, directory[target_successor])
-		if err != nil {
-			return 0, errors.New("Error finding Ring Successor")
-		} else {
-			jsonParsed, _ := gabs.ParseJSON([]byte(response_from_successor))
-			id, _ := utils.ParseToUInt32(jsonParsed.Path("id").String())
-			result = id
-		}
+		// Return who to ask next.
+		result = n.ClosestPrecedingNode(id)
+		utils.Debug("\t[FindRingSuccessor: %s] For %s, please contact my closeset successor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(id), fmt.Sprint(result))
+		more = true
 	}
-	return result, nil
+	return result, more, nil
 }
 
 func (n *ChordNode) ProcessOrderlyLeave(jsonParsed *gabs.Container) string {
@@ -377,7 +366,13 @@ func (n *ChordNode) CheckPredecessor() {
 func (n ChordNode) Put(key string, value string) (string, error) {
 	//replyTo := msg.Path("reply-to").String()
 	id := utils.ComputeId(key)
-	targetNode, _ := n.FindRingSuccessor(id)
+	var targetNode uint32
+	for {
+		var more bool
+		targetNode, more, _ = n.FindRingSuccessor(id)
+		id = targetNode
+		if !more {break;}
+	}
 	// Should we store it on this node?
 	if targetNode == n.ID {
 		n.Data[key] = value
@@ -455,7 +450,17 @@ func (n *ChordNode) ProcessIncomingCommand(msg string) (string, error) {
 		return "", nil
 	case "find-ring-successor":
 		id, _ := utils.ParseToUInt32(jsonParsed.Path("id").String())
-		result, err := n.FindRingSuccessor(id)
+		var err error
+		err = nil
+		var result uint32
+		for {
+			var more bool
+			result, more, err = n.FindRingSuccessor(id)
+			id = result
+			if !more { break;}
+			fmt.Printf("=========================================================MORE: %v\n\n", more)
+		}
+
 		if err != nil {
 			return "", err
 		} else {
