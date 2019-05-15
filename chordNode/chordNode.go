@@ -13,16 +13,6 @@ import (
 	zmq "github.com/pebbe/zmq4"
 )
 
-
-type fingerTableEntry struct {
-	Key       uint32
-	Successor uint32
-}
-type fingerTable struct {
-	Entries []fingerTableEntry
-	Size    int
-}
-
 /*
 A node capable of joining and operating a Chord ring
 */
@@ -30,7 +20,7 @@ type ChordNode struct {
 	ID		uint32
 	Predecessor	*uint32
 	Successor	*uint32
-	Table		fingerTable
+	Table		[32](*uint32)
 	Address		string
 	Port		int
 	InRing		bool
@@ -49,7 +39,9 @@ func New(address string, port int, directory *map[uint32]string) *ChordNode {
 		Address: address,
 		Port:    port}
 	n.Successor = new(uint32)
-	n.Table = fingerTable{Size: 32}
+	for i := 0; i < len(n.Table); i++ {
+		n.Table[i] = nil
+	}
 	n.Data = make(map[string]string)
 	n.Directory = directory
 	n.InRing = false
@@ -256,16 +248,10 @@ func (n *ChordNode) FindRingSuccessor(id uint32) (uint32, error) {
 		result = n.ID
 	} else if(utils.IsBetween(n.ID, *(n.Successor), id)) {
 		utils.Debug("\t[FindRingSuccessor: %s] id: %s is between %s and its successor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(id), fmt.Sprint(n.ID), fmt.Sprint(*(n.Successor)))
-		n.mux.Lock()
 		result = *(n.Successor)
-		*(n.Successor) = id
-		n.mux.Unlock()
 	} else if (n.Predecessor != nil) && (utils.IsBetween(*(n.Predecessor), n.ID, id)) {
 		utils.Debug("\t[FindRingSuccessor: %s] id: %s is between %s's predecessorr: %s and itself\n", fmt.Sprint(n.ID), fmt.Sprint(id), fmt.Sprint(n.ID), fmt.Sprint(*(n.Predecessor)))
-		n.mux.Lock()
 		result = n.ID
-		*(n.Predecessor) = id
-		n.mux.Unlock()
 	} else {
 		// Recursively ask successors.
 		utils.Debug("\t[FindRingSuccessor: %s] Passing message to successor: %s\n", fmt.Sprint(n.ID), fmt.Sprint(*(n.Successor)))
