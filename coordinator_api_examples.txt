@@ -1,9 +1,0 @@
-// Get current mapping of node ids to addresses
-curl -X GET http://localhost:8080/nodeDirectory
-
-
-// Get nodes
-curl -X GET http://localhost:8080/nodes
-
-// Create a node
-curl -X POST http://localhost:8080/nodes

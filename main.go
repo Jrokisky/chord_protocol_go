@@ -5,13 +5,13 @@ import (
 	"chord/utils"
 
 	"encoding/json"
-	"net/http"
-	"strconv"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"math/rand"
+	"net/http"
+	"strconv"
 	"time"
-	"errors"
 
 	"github.com/gorilla/mux"
 )
@@ -51,7 +51,7 @@ func main() {
 	go CheckPredecessorLoop()
 	go FixFinger()
 	router.HandleFunc("/visualize", VizHandler).Methods("GET")
-	fs := http.FileServer(http.Dir("./chord/static"))
+	fs := http.FileServer(http.Dir("./static"))
 	router.PathPrefix("/js/").Handler(fs)
 	router.PathPrefix("/css/").Handler(fs)
 	router.HandleFunc("/nodes", NodeHandler).Methods("GET", "POST")
@@ -109,6 +109,7 @@ func CheckPredecessorLoop() {
 		}
 	}
 }
+
 // API ENDPOINTS
 func NodeHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
@@ -143,15 +144,14 @@ func MultiNodeHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func VizHandler(w http.ResponseWriter, r *http.Request) {
-	f, err := ioutil.ReadFile("chord/static/page.html")
+	f, err := ioutil.ReadFile("./static/page.html")
 	if err != nil {
-	json.NewEncoder(w).Encode(err)
+		json.NewEncoder(w).Encode(err)
 	} else {
 		w.Header().Set("Content-type", "text/html")
 		fmt.Fprintf(w, string(f))
 	}
 }
-
 
 func NodeJoinHandler(w http.ResponseWriter, r *http.Request) {
 	params := mux.Vars(r)
@@ -212,4 +212,3 @@ func NodeDirectoryHandler(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(NodeDirectory)
 	}
 }
-
