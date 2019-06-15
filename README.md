@@ -3,9 +3,9 @@
 ## Background
 
 ### Authors
-* [Duncan Beard] (https://github.com/DuncanBeard)
-* [Justin Rokisky] (https://github.com/Jrokisky)
-* [Frank Serna] (https://github.com/rancid2040)
+* [Duncan Beard](https://github.com/DuncanBeard)
+* [Justin Rokisky](https://github.com/Jrokisky)
+* [Frank Serna](https://github.com/rancid2040)
 
 ### Disclaimer
 This was a semester project completed on a deadline, so there are likely bugs.
