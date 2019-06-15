@@ -14,8 +14,9 @@ This was a semester project completed on a deadline, so there are likely bugs.
 
 ## Instructions
 1. Clone/download/unzip the project repository into the `src` folder of your go development folder
-2. Run `go run main.go`
-3. Try it out at `http://localhost:8080/visualize`
+2. Run `go build main.go`
+3. Run `./main`
+4. Try it out at `http://localhost:8080/visualize`
 
 ## Visualizer
 
